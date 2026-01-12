@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mert & Melek - Özel İlişki Web Sitesi
 
-## Getting Started
+Bu proje, uzak mesafe ilişkisi yaşayan Mert ve Melek çifti için tasarlanmış kişiselleştirilmiş, interaktif bir web sitesidir.
 
-First, run the development server:
+## Özellikler
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Giriş Ekranı**: Minimalist animasyonlarla Mert ve Melek için ayrı giriş butonları.
+- **Dashboard**: Tanışma ve kavuşma sayaçları, hava durumu widget'i.
+- **İnteraktif Özellikler**: "Seni Özledim" butonu, ruh hali seçici.
+- **Kişiselleştirilmiş Alanlar**: Sürpriz notlar, özel kutular.
+- **Ortak Arşiv**: Zaman tüneli, bucket list, Spotify playlist.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Teknoloji
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Next.js 14 (App Router)
+- TypeScript
+- Tailwind CSS
+- Framer Motion (Animasyonlar)
+- Firebase (Backend ve veritabanı)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Kurulum
 
-## Learn More
+1. Bağımlılıkları yükleyin:
+   ```bash
+   npm install
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. Firebase konfigürasyonunu ayarlayın:
+   - `.env.local` dosyasında Firebase anahtarlarını güncelleyin.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Geliştirme sunucusunu başlatın:
+   ```bash
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini açın.
 
-## Deploy on Vercel
+## Yapılandırma
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Tarihler**: `app/dashboard/page.tsx` dosyasında başlangıç tarihini ve kavuşma tarihini güncelleyin.
+- **Şifre**: `app/page.tsx` dosyasında şifreyi değiştirin.
+- **Hava Durumu API**: Gerçek API entegrasyonu için OpenWeatherMap kullanın.
+- **Firebase**: Firestore koleksiyonlarını oluşturun (counters, notes, etc.).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Dağıtım
+
+Vercel veya başka bir platformda dağıtabilirsiniz. Firebase konfigürasyonunu environment variables olarak ayarlayın.
