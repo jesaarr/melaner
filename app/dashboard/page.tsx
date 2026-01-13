@@ -72,7 +72,7 @@ const Dashboard = () => {
     return () => { unsubStats(); clearInterval(interval); };
   }, [user]);
 
-  // --- ARIZA TESPİT MODLU YOGI FONKSİYONU ---
+  // --- KESİN ÇÖZÜM: YOGI AI ENTEGRASYONU ---
   const handleYogiChat = async () => {
     if (!yogiInput.trim() || isYogiTyping) return;
 
@@ -84,39 +84,54 @@ const Dashboard = () => {
     try {
       const API_KEY = process.env.NEXT_PUBLIC_YOGI_API_KEY;
       
-      // 1. ADIM: Anahtar kontrolü
       if (!API_KEY) {
-        setYogiMessages(prev => [...prev, { role: 'bot', text: "❌ HATA: API Anahtarı bulunamadı. Vercel'deki isim 'NEXT_PUBLIC_YOGI_API_KEY' olmalı." }]);
+        setYogiMessages(prev => [...prev, { role: 'bot', text: "Miyav... Anahtarımı bulamıyorum, Vercel ayarlarını kontrol eder misin? 🐾" }]);
         setIsYogiTyping(false);
         return;
       }
 
+      // v1 sürümü ve gemini-1.5-flash kombinasyonu
       const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `Sen Mert ve Melek'in kedisi Yogi'sin. Şirin bir dille cevap ver. Kullanıcı: ${currentInput}` }] }]
+          contents: [{ 
+            parts: [{ 
+              text: `Sen Mert ve Melek'in kedisi Yogi'sin. Çok şirin, bazen miyavlayan, sevgi dolu bir dille cevap ver. Kullanıcı: ${currentInput}` 
+            }] 
+          }]
         })
       });
 
       const data = await response.json();
 
-      // 2. ADIM: Google Hatası kontrolü
       if (data.error) {
-        setYogiMessages(prev => [...prev, { role: 'bot', text: `❌ GOOGLE HATASI: ${data.error.message}` }]);
+        // HATA VARSA: Gemini-Pro modelini yedek olarak dene
+        const fallback = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `Miyav! Ben Yogi. ${currentInput}` }] }]
+          })
+        });
+        const fallbackData = await fallback.json();
+        
+        if (fallbackData.error) {
+          setYogiMessages(prev => [...prev, { role: 'bot', text: `❌ HATA: ${fallbackData.error.message}` }]);
+        } else {
+          setYogiMessages(prev => [...prev, { role: 'bot', text: fallbackData.candidates[0].content.parts[0].text }]);
+        }
       } else {
-        const botResponse = data.candidates[0].content.parts[0].text;
-        setYogiMessages(prev => [...prev, { role: 'bot', text: botResponse }]);
+        setYogiMessages(prev => [...prev, { role: 'bot', text: data.candidates[0].content.parts[0].text }]);
       }
 
     } catch (error) {
-      setYogiMessages(prev => [...prev, { role: 'bot', text: "💥 Bağlantı koptu. İnternetini veya API limitini kontrol et." }]);
+      setYogiMessages(prev => [...prev, { role: 'bot', text: "Miyav! Devrelerim ısındı, bir az sonra tekrar dener misin? 🐾" }]);
     } finally {
       setIsYogiTyping(false);
     }
   };
 
-  // --- DİĞER FONKSİYONLAR ---
   const addXP = async (amount: number) => {
     const field = user === 'mert' ? 'mertXP' : 'melekXP';
     await updateDoc(doc(db, "stats", "ozlem"), { [field]: increment(amount) });
@@ -393,53 +408,53 @@ const Dashboard = () => {
 
         {activeTab === 'genel' && (
           <motion.div key="genel" className="max-w-4xl mx-auto">
-             <div className="text-center mb-8">
-               <button onClick={() => setShowAddForm(!showAddForm)} className="bg-purple-500 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 mx-auto">
-                 {showAddForm ? <X size={18}/> : <Plus size={18}/>} Yeni Ekle
-               </button>
-             </div>
-             {showAddForm && (
-               <div className="bg-white p-6 rounded-3xl shadow-xl mb-10 overflow-hidden flex flex-wrap gap-4 items-end">
-                 <div className="flex-1 min-w-[200px]">
-                   <input value={newGeneralText} onChange={(e) => setNewGeneralText(e.target.value)} placeholder="İçerik..." className="w-full p-3 border rounded-xl mb-2" />
-                   <select value={generalType} onChange={(e:any) => setGeneralType(e.target.value)} className="w-full p-3 border rounded-xl text-sm">
-                     <option value="like">Sevilen ✅</option><option value="dislike">Sevilmeyen ❌</option>
-                   </select>
-                 </div>
-                 <input type="color" value={boxColor} onChange={(e) => setBoxColor(e.target.value)} className="w-16 h-12 p-1 border rounded-xl cursor-pointer" />
-                 <button onClick={async () => { if(newGeneralText.trim()){ await addDoc(collection(db, "genel"), { sender: user, text: newGeneralText, type: generalType, color: boxColor, timestamp: new Date().toISOString() }); setNewGeneralText(''); setShowAddForm(false); addXP(15); } }} className="bg-green-500 text-white px-6 py-3 rounded-xl font-bold">Kaydet</button>
-               </div>
-             )}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               {['like', 'dislike'].map(type => (
-                 <div key={type} className="space-y-4 text-gray-800">
-                   <h4 className={`text-center font-bold ${type === 'like' ? 'text-green-600' : 'text-red-600'}`}>{type === 'like' ? 'Sevilenler' : 'Sevilmeyenler'}</h4>
-                   {generalItems.filter(i => i.type === type).map(item => (
-                     <div key={item.id} style={{ borderLeftColor: item.color }} className="p-4 rounded-2xl shadow bg-white border-l-8 relative group">
-                       <button onClick={async () => await deleteDoc(doc(db, "genel", item.id))} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-red-400"><Trash2 size={14}/></button>
-                       <p className="text-[10px] font-black opacity-30 uppercase">{item.sender}</p><p className="font-medium">{item.text}</p>
-                     </div>
-                   ))}
-                 </div>
-               ))}
-             </div>
+              <div className="text-center mb-8">
+                <button onClick={() => setShowAddForm(!showAddForm)} className="bg-purple-500 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 mx-auto">
+                  {showAddForm ? <X size={18}/> : <Plus size={18}/>} Yeni Ekle
+                </button>
+              </div>
+              {showAddForm && (
+                <div className="bg-white p-6 rounded-3xl shadow-xl mb-10 overflow-hidden flex flex-wrap gap-4 items-end">
+                  <div className="flex-1 min-w-[200px]">
+                    <input value={newGeneralText} onChange={(e) => setNewGeneralText(e.target.value)} placeholder="İçerik..." className="w-full p-3 border rounded-xl mb-2" />
+                    <select value={generalType} onChange={(e:any) => setGeneralType(e.target.value)} className="w-full p-3 border rounded-xl text-sm">
+                      <option value="like">Sevilen ✅</option><option value="dislike">Sevilmeyen ❌</option>
+                    </select>
+                  </div>
+                  <input type="color" value={boxColor} onChange={(e) => setBoxColor(e.target.value)} className="w-16 h-12 p-1 border rounded-xl cursor-pointer" />
+                  <button onClick={async () => { if(newGeneralText.trim()){ await addDoc(collection(db, "genel"), { sender: user, text: newGeneralText, type: generalType, color: boxColor, timestamp: new Date().toISOString() }); setNewGeneralText(''); setShowAddForm(false); addXP(15); } }} className="bg-green-500 text-white px-6 py-3 rounded-xl font-bold">Kaydet</button>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {['like', 'dislike'].map(type => (
+                  <div key={type} className="space-y-4 text-gray-800">
+                    <h4 className={`text-center font-bold ${type === 'like' ? 'text-green-600' : 'text-red-600'}`}>{type === 'like' ? 'Sevilenler' : 'Sevilmeyenler'}</h4>
+                    {generalItems.filter(i => i.type === type).map(item => (
+                      <div key={item.id} style={{ borderLeftColor: item.color }} className="p-4 rounded-2xl shadow bg-white border-l-8 relative group">
+                        <button onClick={async () => await deleteDoc(doc(db, "genel", item.id))} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-red-400"><Trash2 size={14}/></button>
+                        <p className="text-[10px] font-black opacity-30 uppercase">{item.sender}</p><p className="font-medium">{item.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
           </motion.div>
         )}
 
         {activeTab === 'dosyalar' && (
           <motion.div key="dosyalar" className="max-w-4xl mx-auto">
-             {!passwordCorrect ? (
-               <div className="max-w-md mx-auto bg-white p-8 rounded-3xl shadow-2xl text-center">
-                 <Lock className="mx-auto mb-4 text-gray-400" size={40} />
-                 <h3 className="text-xl font-bold mb-4">Gizli Galeri</h3>
-                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 border rounded-xl mb-4 text-center" placeholder="Şifreyi Gir" />
-                 <button onClick={() => password === '1025' ? setPasswordCorrect(true) : alert('Yanlış!')} className="w-full py-3 bg-black text-white rounded-xl font-bold">Giriş Yap</button>
-               </div>
-             ) : (
-               <div className="bg-white p-8 rounded-3xl shadow-xl text-center border-2 border-dashed border-pink-200">
-                 <p className="text-gray-500">Fotoğraflar yakında buraya yüklenecek...</p>
-               </div>
-             )}
+              {!passwordCorrect ? (
+                <div className="max-w-md mx-auto bg-white p-8 rounded-3xl shadow-2xl text-center">
+                  <Lock className="mx-auto mb-4 text-gray-400" size={40} />
+                  <h3 className="text-xl font-bold mb-4">Gizli Galeri</h3>
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 border rounded-xl mb-4 text-center" placeholder="Şifreyi Gir" />
+                  <button onClick={() => password === '1025' ? setPasswordCorrect(true) : alert('Yanlış!')} className="w-full py-3 bg-black text-white rounded-xl font-bold">Giriş Yap</button>
+                </div>
+              ) : (
+                <div className="bg-white p-8 rounded-3xl shadow-xl text-center border-2 border-dashed border-pink-200">
+                  <p className="text-gray-500">Fotoğraflar yakında buraya yüklenecek...</p>
+                </div>
+              )}
           </motion.div>
         )}
 
