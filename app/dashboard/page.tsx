@@ -25,6 +25,7 @@ const Dashboard = () => {
   const [yogiInput, setYogiInput] = useState('');
   const [yogiRequest, setYogiRequest] = useState('');
   const [receivedRequests, setReceivedRequests] = useState<any[]>([]);
+  const [isYogiTyping, setIsYogiTyping] = useState(false); // Yogi cevap veriyor mu?
 
   // --- STATS & CONTENT STATE ---
   const [stats, setStats] = useState({ mert: 0, melek: 0, love: 0, mertXP: 0, melekXP: 0, mertMsg: 0, melekMsg: 0 });
@@ -62,7 +63,6 @@ const Dashboard = () => {
     onSnapshot(query(collection(db, "genel"), orderBy("timestamp", "desc")), (s) => {
       setGeneralItems(s.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    // Mert ise talepleri dinle
     if (user === 'mert') {
       onSnapshot(query(collection(db, "talepler"), orderBy("timestamp", "desc"), limit(5)), (s) => {
         setReceivedRequests(s.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -72,6 +72,42 @@ const Dashboard = () => {
     return () => { unsubStats(); clearInterval(interval); };
   }, [user]);
 
+  // --- YOGI AI AKILLI SOHBET FONKSİYONU ---
+  const handleYogiChat = async () => {
+    if (!yogiInput.trim() || isYogiTyping) return;
+
+    const currentInput = yogiInput;
+    setYogiMessages(prev => [...prev, { role: 'user', text: currentInput }]);
+    setYogiInput('');
+    setIsYogiTyping(true);
+
+    try {
+      const API_KEY = process.env.NEXT_PUBLIC_YOGI_API_KEY;
+      const SYSTEM_PROMPT = `Sen Mert ve Melek'in uygulamasındaki akıllı kedi Yogi'sin. 
+      Mert ve Melek 10 Ekim'de tanıştı. Mert yakışıklı bir yazılımcı, Melek çok güzel ve özel biri.
+      Karakterin: Sempatik, bazen hafif huysuz, çok sadık. Cümlelerine "Miyav" ekle. 
+      Onlara aşk tavsiyeleri ver, sorularını kedi gibi cevapla.`;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nKullanıcı: ${currentInput}` }] }]
+        })
+      });
+
+      const data = await response.json();
+      const botResponse = data.candidates[0].content.parts[0].text;
+
+      setYogiMessages(prev => [...prev, { role: 'bot', text: botResponse }]);
+    } catch (error) {
+      setYogiMessages(prev => [...prev, { role: 'bot', text: "Miyav! Devrelerim ısındı, bir az sonra tekrar dener misin? 🐾" }]);
+    } finally {
+      setIsYogiTyping(false);
+    }
+  };
+
+  // --- DİĞER FONKSİYONLAR ---
   const addXP = async (amount: number) => {
     const field = user === 'mert' ? 'mertXP' : 'melekXP';
     await updateDoc(doc(db, "stats", "ozlem"), { [field]: increment(amount) });
@@ -124,73 +160,70 @@ const Dashboard = () => {
   return (
     <div className={`min-h-screen p-8 bg-gradient-to-br ${themes[themeColor]} transition-colors duration-500`}>
       
-      {/* SOL ÜST AYARLAR BUTONU */}
+      {/* AYARLAR BUTONU */}
       <button onClick={() => setIsSettingsOpen(true)} className="fixed top-6 left-6 p-3 bg-white/80 backdrop-blur-md rounded-full shadow-lg z-[60] hover:bg-white transition-all">
         <Settings size={22} className="text-gray-600" />
       </button>
 
-      {/* YOGI CHAT BUTONU (SAĞ ALT) */}
+      {/* YOGI CHAT BUTONU */}
       <button onClick={() => setIsYogiActive(true)} className="fixed bottom-6 right-6 p-4 bg-pink-500 text-white rounded-full shadow-2xl z-[60] hover:scale-110 transition-all">
         <MessageCircle size={24} />
       </button>
 
-      {/* AYARLAR SIDEBAR PANELİ */}
+      {/* AYARLAR SIDEBAR */}
       <AnimatePresence>
         {isSettingsOpen && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSettingsOpen(false)} className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[70]" />
             <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="fixed top-0 left-0 h-full w-85 bg-white shadow-2xl z-[80] p-6 text-gray-800 overflow-y-auto">
-               <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black italic">SİSTEM AYARLARI</h2><button onClick={() => setIsSettingsOpen(false)}><X /></button></div>
-               
-               {/* RENK SKALASI */}
-               <div className="mb-8">
-                 <p className="text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-widest flex items-center gap-2"><Palette size={14}/> Tema Rengi</p>
-                 <div className="flex gap-2">
-                   {['pink', 'blue', 'purple', 'orange', 'green'].map(c => (
-                     <button key={c} onClick={() => setThemeColor(c)} className={`w-8 h-8 rounded-full ${themeColor === c ? 'ring-2 ring-black ring-offset-2' : ''}`} style={{ background: c === 'pink' ? '#f472b6' : c === 'blue' ? '#60a5fa' : c === 'purple' ? '#a78bfa' : c === 'orange' ? '#fb923c' : '#4ade80' }} />
-                   ))}
-                 </div>
-               </div>
+                <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black italic">SİSTEM AYARLARI</h2><button onClick={() => setIsSettingsOpen(false)}><X /></button></div>
+                
+                <div className="mb-8">
+                  <p className="text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-widest flex items-center gap-2"><Palette size={14}/> Tema Rengi</p>
+                  <div className="flex gap-2">
+                    {['pink', 'blue', 'purple', 'orange', 'green'].map(c => (
+                      <button key={c} onClick={() => setThemeColor(c)} className={`w-8 h-8 rounded-full ${themeColor === c ? 'ring-2 ring-black ring-offset-2' : ''}`} style={{ background: c === 'pink' ? '#f472b6' : c === 'blue' ? '#60a5fa' : c === 'purple' ? '#a78bfa' : c === 'orange' ? '#fb923c' : '#4ade80' }} />
+                    ))}
+                  </div>
+                </div>
 
-               {/* TALEP ETME (MELEK İÇİN) */}
-               {user === 'melek' && (
-                 <div className="mb-8 border-t pt-6">
-                   <p className="text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-widest flex items-center gap-2"><Star size={14}/> Mert'ten Bir Şey İste</p>
-                   <div className="flex flex-col gap-2">
-                     <textarea value={yogiRequest} onChange={(e) => setYogiRequest(e.target.value)} placeholder="Örn: Uygulamaya şu müziği ekle..." className="text-sm border rounded-xl p-3 bg-gray-50 outline-none" rows={3} />
-                     <button onClick={handleSendRequest} className="w-full py-2 bg-black text-white rounded-xl text-sm font-bold">Talebi Gönder</button>
-                   </div>
-                 </div>
-               )}
+                {user === 'melek' && (
+                  <div className="mb-8 border-t pt-6">
+                    <p className="text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-widest flex items-center gap-2"><Star size={14}/> Mert'ten Bir Şey İste</p>
+                    <div className="flex flex-col gap-2">
+                      <textarea value={yogiRequest} onChange={(e) => setYogiRequest(e.target.value)} placeholder="Örn: Uygulamaya şu müziği ekle..." className="text-sm border rounded-xl p-3 bg-gray-50 outline-none" rows={3} />
+                      <button onClick={handleSendRequest} className="w-full py-2 bg-black text-white rounded-xl text-sm font-bold">Talebi Gönder</button>
+                    </div>
+                  </div>
+                )}
 
-               {/* GELEN TALEPLER (MERT İÇİN) */}
-               {user === 'mert' && (
-                 <div className="mb-8 border-t pt-6">
-                   <p className="text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-widest flex items-center gap-2"><Trophy size={14}/> Melek'in İstekleri</p>
-                   <div className="space-y-2">
-                     {receivedRequests.length > 0 ? receivedRequests.map(r => (
-                       <div key={r.id} className="p-3 bg-blue-50 rounded-xl border border-blue-100 relative group">
-                         <p className="text-xs text-blue-800">{r.text}</p>
-                         <button onClick={async () => await deleteDoc(doc(db, "talepler", r.id))} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-400"><X size={12}/></button>
-                       </div>
-                     )) : <p className="text-xs italic text-gray-400 text-center">Henüz talep yok...</p>}
-                   </div>
-                 </div>
-               )}
+                {user === 'mert' && (
+                  <div className="mb-8 border-t pt-6">
+                    <p className="text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-widest flex items-center gap-2"><Trophy size={14}/> Melek'in İstekleri</p>
+                    <div className="space-y-2">
+                      {receivedRequests.length > 0 ? receivedRequests.map(r => (
+                        <div key={r.id} className="p-3 bg-blue-50 rounded-xl border border-blue-100 relative group">
+                          <p className="text-xs text-blue-800">{r.text}</p>
+                          <button onClick={async () => await deleteDoc(doc(db, "talepler", r.id))} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-400"><X size={12}/></button>
+                        </div>
+                      )) : <p className="text-xs italic text-gray-400 text-center">Henüz talep yok...</p>}
+                    </div>
+                  </div>
+                )}
 
-               <div className="mt-auto border-t pt-6">
-                 <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-widest">GÜVENLİK</p>
-                 <div className="flex gap-2">
-                    <input type="text" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Yeni Şifre" className="flex-1 text-sm border rounded-lg px-3 py-2 outline-none" />
-                    <button onClick={async () => { if(newPass.length >= 4) { await setDoc(doc(db, "ayarlar", "sifreler"), { [user as string]: newPass }, { merge: true }); setNewPass(''); alert('Şifre güncellendi!'); } }} className="p-2 bg-gray-800 text-white rounded-lg"><Check size={18}/></button>
-                 </div>
-               </div>
+                <div className="mt-auto border-t pt-6">
+                  <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-widest">GÜVENLİK</p>
+                  <div className="flex gap-2">
+                     <input type="text" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Yeni Şifre" className="flex-1 text-sm border rounded-lg px-3 py-2 outline-none" />
+                     <button onClick={async () => { if(newPass.length >= 4) { await setDoc(doc(db, "ayarlar", "sifreler"), { [user as string]: newPass }, { merge: true }); setNewPass(''); alert('Şifre güncellendi!'); } }} className="p-2 bg-gray-800 text-white rounded-lg"><Check size={18}/></button>
+                  </div>
+                </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
-      {/* YOGI ASİSTANI (FLOATING) */}
+      {/* --- GÜNCELLENMİŞ YOGI CHAT PANELİ --- */}
       <AnimatePresence>
         {isYogiActive && (
           <motion.div initial={{ opacity: 0, scale: 0.8, y: 100 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.8, y: 100 }} className="fixed bottom-24 right-6 w-85 h-[450px] bg-white rounded-[32px] shadow-2xl z-[100] flex flex-col border border-pink-100 overflow-hidden">
@@ -203,16 +236,17 @@ const Dashboard = () => {
               {yogiMessages.map((m, i) => (
                 <div key={i} className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${m.role === 'user' ? 'bg-pink-500 text-white ml-auto rounded-tr-none' : 'bg-white border border-gray-100 rounded-tl-none'}`}>{m.text}</div>
               ))}
+              {isYogiTyping && <div className="text-xs text-pink-400 italic animate-pulse ml-2">Yogi mırıldanıyor... 🐾</div>}
             </div>
             <div className="p-4 bg-white border-t flex gap-2 items-center">
-              <input value={yogiInput} onChange={(e) => setYogiInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && yogiInput.trim() && (setYogiMessages(p=>[...p,{role:'user',text:yogiInput},{role:'bot',text:'Miyav! Şimdilik sadece mırıldanıyorum ama yakında her şeyi yapabileceğim! 🐾'}]), setYogiInput(''))} className="flex-1 text-sm border-none bg-gray-100 rounded-full px-4 py-3 outline-none focus:ring-2 ring-pink-200" placeholder="Bir şeyler yaz..." />
-              <button className="p-3 bg-pink-500 text-white rounded-full shadow-lg hover:bg-pink-600 transition-colors"><Send size={18}/></button>
+              <input value={yogiInput} onChange={(e) => setYogiInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleYogiChat()} className="flex-1 text-sm border-none bg-gray-100 rounded-full px-4 py-3 outline-none focus:ring-2 ring-pink-200" placeholder="Bir şeyler yaz..." disabled={isYogiTyping} />
+              <button onClick={handleYogiChat} disabled={isYogiTyping} className="p-3 bg-pink-500 text-white rounded-full shadow-lg hover:bg-pink-600 transition-colors disabled:bg-gray-300"><Send size={18}/></button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* SEKMELER */}
+      {/* SEKMELER VE DİĞER İÇERİKLER AYNI ŞEKİLDE DEVAM EDİYOR... */}
       <div className="max-w-5xl mx-auto mb-8 mt-16 flex flex-wrap justify-center gap-3">
         {['tarihler', 'mektuplar', 'ozlem', 'istatistik', 'genel', 'dosyalar', 'sanat', 'sinema', 'kapsul'].map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-3 rounded-full font-bold transition-all flex items-center gap-2 ${activeTab === tab ? 'bg-gradient-to-r from-pink-400 to-blue-400 text-white shadow-lg' : 'bg-white/60 text-gray-600 hover:bg-white shadow-sm'}`}>
@@ -224,7 +258,6 @@ const Dashboard = () => {
       </div>
 
       <AnimatePresence mode="wait">
-        {/* İSTATİSTİK SAYFASI */}
         {activeTab === 'istatistik' && (
           <motion.div key="istatistik" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="max-w-5xl mx-auto space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -295,7 +328,6 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* DİĞER SEKMELER (Tarihler, Mektuplar vb.) AYNI ŞEKİLDE DURUYOR */}
         {activeTab === 'tarihler' && (
           <motion.div key="tarihler" className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
