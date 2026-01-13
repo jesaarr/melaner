@@ -3,12 +3,22 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, X, Palette, Trash2, MessageCircle, Send, Plus, Lock, Check, Clock, BarChart3, Trophy, Star, Image as ImageIcon, Upload, Loader2, Heart, Moon, Sun } from 'lucide-react'; 
+import { Settings, X, Palette, Trash2, MessageCircle, Send, Plus, Lock, Check, Clock, BarChart3, Trophy, Star, Image as ImageIcon, Upload, Loader2, Heart, Moon, Sun, Mail } from 'lucide-react'; 
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, increment, collection, addDoc, query, orderBy, limit, deleteDoc, setDoc } from "firebase/firestore";
 import SanatOdasi from '@/components/SanatOdasi';
 import SinemaSalonu from '@/components/SinemaSalonu';
 import ZamanKapsulu from '@/components/ZamanKapsulu';
+
+// --- SLOWLY PUL BİLEŞENİ (Sadece mektuplarda görünecek) ---
+const LetterStamp = ({ sender }: { sender: string }) => (
+  <div className="absolute top-4 right-4 w-12 h-16 bg-white border-2 border-dashed border-gray-300 p-1 shadow-sm rotate-3 group-hover:rotate-6 transition-transform z-10">
+    <div className={`w-full h-full flex items-center justify-center text-xl ${sender === 'mert' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-600'}`}>
+      {sender === 'mert' ? '⚓' : '🌸'}
+    </div>
+    <div className="absolute -bottom-1 -right-1 bg-yellow-600 text-[6px] text-white px-1 font-bold rounded-sm uppercase">Post</div>
+  </div>
+);
 
 const Dashboard = () => {
   const searchParams = useSearchParams();
@@ -41,6 +51,10 @@ const Dashboard = () => {
   const [galeriResimleri, setGaleriResimleri] = useState<any[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // --- YENİ MEKTUP ÖZELLİKLERİ İÇİN STATE ---
+  const [selectedLetter, setSelectedLetter] = useState<any>(null);
+  const [letterPaperColor, setLetterPaperColor] = useState('#fdfbf7');
 
   const dates = {
     tanisma: new Date('2025-10-10'),
@@ -85,15 +99,15 @@ const Dashboard = () => {
   }, [user]);
 
   const addXP = async (amount: number) => {
-    if (isGuest) return; // Misafir XP kazanamaz
+    if (isGuest) return; 
     const field = user === 'mert' ? 'mertXP' : 'melekXP';
     await updateDoc(doc(db, "stats", "ozlem"), { [field]: increment(amount) });
   };
 
   const getLevelInfo = (xp: number) => {
     if (xp < 100) return { level: 1, rank: 'Yeni Tanışanlar', color: 'text-amber-500', icon: '🤎', next: 100 };
-    if (xp < 500) return { level: 2, rank: 'Sırılsıklam Aşıklar', color: 'text-slate-400', icon: '🥈', next: 500 };
-    if (xp < 1000) return { level: 3, rank: 'Ruh Öküzleri', color: 'text-yellow-400', icon: '💛', next: 1000 };
+    if (xp < 500) return { level: 2, rank: 'Acemi', color: 'text-slate-400', icon: '🥈', next: 500 };
+    if (xp < 1000) return { level: 3, rank: 'Profesör', color: 'text-yellow-400', icon: '💛', next: 1000 };
     return { level: 4, rank: 'Ebedi Bağ', color: 'text-purple-400', icon: '💜', next: 5000 };
   };
 
@@ -150,7 +164,13 @@ const Dashboard = () => {
   const handleSendMessage = async () => {
     if (handleGuestWarning()) return;
     if (newMessage.trim()) {
-      await addDoc(collection(db, "mektuplar"), { from: user, to: user === 'mert' ? 'melek' : 'mert', message: newMessage, timestamp: new Date().toISOString() });
+      await addDoc(collection(db, "mektuplar"), { 
+        from: user, 
+        to: user === 'mert' ? 'melek' : 'mert', 
+        message: newMessage, 
+        color: letterPaperColor, // Renk kaydediliyor
+        timestamp: new Date().toISOString() 
+      });
       await updateDoc(doc(db, "stats", "ozlem"), { [user === 'mert' ? 'mertMsg' : 'melekMsg']: increment(1) });
       setNewMessage('');
       addXP(20);
@@ -188,7 +208,6 @@ const Dashboard = () => {
             <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className={`fixed top-0 left-0 h-full w-80 ${isDarkMode ? 'bg-slate-900' : 'bg-white'} shadow-2xl z-[80] p-6 border-r border-white/10 overflow-y-auto`}>
                 <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black italic tracking-tighter">AYARLAR</h2><button onClick={() => setIsSettingsOpen(false)}><X /></button></div>
                 <div className="space-y-8">
-                  {/* Tema Rengi */}
                   <div>
                     <p className="text-[10px] font-bold opacity-50 mb-3 uppercase tracking-widest flex items-center gap-2"><Palette size={14}/> Tema Rengi</p>
                     <div className="flex gap-2">
@@ -197,16 +216,12 @@ const Dashboard = () => {
                       ))}
                     </div>
                   </div>
-
-                  {/* Karanlık/Aydınlık Mod */}
                   <div>
                     <p className="text-[10px] font-bold opacity-50 mb-3 uppercase tracking-widest flex items-center gap-2"><Moon size={14}/> Görünüm</p>
                     <button onClick={() => setIsDarkMode(!isDarkMode)} className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${isDarkMode ? 'bg-slate-800 text-yellow-400' : 'bg-slate-100 text-slate-800'}`}>
                       {isDarkMode ? <><Sun size={18}/> Aydınlık Moda Geç</> : <><Moon size={18}/> Karanlık Moda Geç</>}
                     </button>
                   </div>
-
-                  {/* İstekler Bölümü (Guest'e kapalı) */}
                   {!isGuest && (
                     user === 'melek' ? (
                       <div className="pt-6 border-t border-white/10">
@@ -266,13 +281,12 @@ const Dashboard = () => {
       </div>
 
       <AnimatePresence mode="wait">
-        {/* TARIHLER */}
         {activeTab === 'tarihler' && (
           <motion.div key="tarihler" className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
               { title: 'İlk Tanışma', date: '10/10/2025', color: 'pink', val: dates.tanisma },
               { title: 'Açılma Tarihi', date: '14/12/2025', color: 'orange', val: dates.acilma },
-              { title: 'Sevgili Olma', date: '05/01/2026', color: 'red', val: dates.cikma, span: true, highlight: true },
+              { title: 'ne zaman sevgilim oldun(resmiyen)', date: '05/01/2026', color: 'red', val: dates.cikma, span: true, highlight: true },
               { title: 'Melek Doğum', date: '15/02/2011', color: 'blue', val: dates.melekDogum },
               { title: 'Mert Doğum', date: '21/04/2009', color: 'green', val: dates.mertDogum }
             ].map((d, i) => (
@@ -287,7 +301,123 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* ISTATISTIK */}
+        {/* MEKTUPLAR (SLOWLY STYLE - YENİ ENTEGRASYON) */}
+        {activeTab === 'mektuplar' && (
+          <motion.div key="mektuplar" className="max-w-4xl mx-auto space-y-12 pb-20">
+            {!isGuest && (
+              <div className="bg-white/10 backdrop-blur-md p-6 rounded-[32px] border border-white/10">
+                {/* RENK SEÇİCİ */}
+                <div className="flex gap-2 mb-4 items-center">
+                    <p className="text-[10px] font-bold opacity-50 uppercase tracking-widest mr-2">Kağıt Rengi:</p>
+                    {['#fdfbf7', '#fff1f2', '#f0f9ff', '#f0fdf4', '#faf5ff'].map(c => (
+                        <button key={c} onClick={() => setLetterPaperColor(c)} className={`w-6 h-6 rounded-full border-2 ${letterPaperColor === c ? 'border-yellow-500 scale-125' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                    ))}
+                </div>
+                <textarea 
+                  value={newMessage} 
+                  onChange={(e) => setNewMessage(e.target.value)} 
+                  className="w-full p-6 rounded-2xl text-slate-800 font-serif text-lg leading-relaxed shadow-inner outline-none"
+                  style={{ backgroundColor: letterPaperColor }}
+                  rows={4} 
+                  placeholder="Duygularını kağıda dök..." 
+                />
+                <div className="flex justify-end mt-4">
+                  <button onClick={handleSendMessage} className="px-10 py-3 bg-yellow-700 text-white font-serif italic hover:bg-yellow-800 transition-all shadow-md flex items-center gap-2 rounded-xl">
+                    <Send size={16} /> Mektubu Mühürle (+20 XP)
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ZARFLAR (KAPALI MEKTUP GÖRÜNÜMÜ) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {messages.map((m, index) => (
+                <motion.div 
+                  key={m.id}
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => setSelectedLetter(m)}
+                  className={`cursor-pointer group relative p-8 h-48 ${isDarkMode ? 'bg-[#f4f1ea]' : 'bg-white'} border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between`}
+                  style={{ transform: `rotate(${index % 2 === 0 ? '1deg' : '-1deg'})` }}
+                >
+                  <LetterStamp sender={m.from} />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+                    <Mail size={80} className="text-slate-900" />
+                  </div>
+                  <div className="z-10 mt-auto">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">KAPALI MEKTUP</span>
+                    </div>
+                    <span className="text-[10px] font-serif italic text-slate-400">{new Date(m.timestamp).toLocaleDateString('tr-TR')}</span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* MEKTUP OKUMA MODALI */}
+            <AnimatePresence>
+                {selectedLetter && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedLetter(null)} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+                        <motion.div 
+                            initial={{ scale: 0.9, y: 50, opacity: 0 }}
+                            animate={{ scale: 1, y: 0, opacity: 1 }}
+                            exit={{ scale: 0.9, y: 50, opacity: 0 }}
+                            className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto p-12 shadow-2xl rounded-sm border-t-[12px] border-yellow-700"
+                            style={{ backgroundColor: selectedLetter.color || '#fdfbf7' }}
+                        >
+                            <button onClick={() => setSelectedLetter(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 transition-colors"><X /></button>
+                            <LetterStamp sender={selectedLetter.from} />
+                            
+                            <div className="mb-8 border-b border-slate-200 pb-2">
+                                <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">GÖNDEREN: {selectedLetter.from}</span>
+                                <span className="mx-2 text-slate-300">•</span>
+                                <span className="text-[10px] text-slate-400 italic font-serif">{new Date(selectedLetter.timestamp).toLocaleString('tr-TR')}</span>
+                            </div>
+
+                            <p className="text-slate-800 font-serif text-xl leading-[2] whitespace-pre-wrap first-letter:text-5xl first-letter:font-bold first-letter:text-yellow-700 first-letter:float-left first-letter:mr-3">
+                                {selectedLetter.message}
+                            </p>
+
+                            <div className="mt-12 pt-6 border-t border-dashed border-slate-300 flex justify-between items-center">
+                                <span className="font-serif italic text-slate-500">Sevgilerimle...</span>
+                                {selectedLetter.from === user && !isGuest && (
+                                    <button onClick={async (e) => { 
+                                        e.stopPropagation();
+                                        if(confirm("Bu mektubu kalıcı olarak silmek istiyor musun?")) {
+                                            await deleteDoc(doc(db, "mektuplar", selectedLetter.id));
+                                            setSelectedLetter(null);
+                                        }
+                                    }} className="text-red-300 hover:text-red-500 transition-colors">
+                                        <Trash2 size={20}/>
+                                    </button>
+                                )}
+                            </div>
+                            <div className="absolute inset-0 pointer-events-none opacity-[0.05] bg-[url('https://www.transparenttextures.com/patterns/paper-fibers.png')]"></div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+
+        {activeTab === 'ozlem' && (
+          <motion.div key="ozlem" className="max-w-4xl mx-auto text-center space-y-8">
+            <div className="grid grid-cols-2 gap-8">
+              {['mert', 'melek'].map((p) => (
+                <div key={p} className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-xl'} p-8 rounded-[40px]`}>
+                  <h3 className={`${p === 'mert' ? 'text-blue-500' : 'text-pink-500'} font-black text-[10px] mb-4 uppercase`}>{p}</h3>
+                  <button onClick={async () => { if(!handleGuestWarning()){ await updateDoc(doc(db, "stats", "ozlem"), { [p]: increment(1) }); addXP(5); }}} className="text-6xl hover:scale-110 active:scale-95 transition-transform">{p === 'mert' ? '💙' : '💖'}</button>
+                  <p className="text-3xl font-black mt-4">{(stats as any)[p]}</p>
+                </div>
+              ))}
+            </div>
+            <div className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-2xl'} p-12 rounded-[50px] flex flex-col items-center`}>
+              <button onClick={async () => { if(!handleGuestWarning()){ await updateDoc(doc(db, "stats", "ozlem"), { love: increment(1) }); addXP(10); }}} className="text-8xl animate-pulse active:scale-90 transition-transform">❤️</button>
+              <p className="mt-8 text-2xl font-black text-red-500 uppercase tracking-tighter">{stats.love} KEZ "SENİ SEVİYORUM" DENİLDİ</p>
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'istatistik' && (
           <motion.div key="istatistik" className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
             {[{ name: 'Mert', xp: stats.mertXP || 0, color: 'blue' }, { name: 'Melek', xp: stats.melekXP || 0, color: 'pink' }].map((p, i) => {
@@ -311,7 +441,6 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* GENEL (GEÇİCİ OLARAK KAPALI) */}
         {activeTab === 'genel' && (
           <motion.div key="genel" className="max-w-md mx-auto py-20 text-center">
             <Lock className="mx-auto mb-6 text-purple-500" size={60} />
@@ -320,7 +449,6 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* DOSYALAR */}
         {activeTab === 'dosyalar' && (
           <motion.div key="dosyalar" className="max-w-4xl mx-auto space-y-6">
             {!passwordCorrect && !isGuest ? (
@@ -361,46 +489,6 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* OZLEM */}
-        {activeTab === 'ozlem' && (
-          <motion.div key="ozlem" className="max-w-4xl mx-auto text-center space-y-8">
-            <div className="grid grid-cols-2 gap-8">
-              {['mert', 'melek'].map((p) => (
-                <div key={p} className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-xl'} p-8 rounded-[40px]`}>
-                  <h3 className={`${p === 'mert' ? 'text-blue-500' : 'text-pink-500'} font-black text-[10px] mb-4 uppercase`}>{p}</h3>
-                  <button onClick={async () => { if(!handleGuestWarning()){ await updateDoc(doc(db, "stats", "ozlem"), { [p]: increment(1) }); addXP(5); }}} className="text-6xl hover:scale-110 active:scale-95 transition-transform">{p === 'mert' ? '💙' : '💖'}</button>
-                  <p className="text-3xl font-black mt-4">{(stats as any)[p]}</p>
-                </div>
-              ))}
-            </div>
-            <div className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-2xl'} p-12 rounded-[50px] flex flex-col items-center`}>
-              <button onClick={async () => { if(!handleGuestWarning()){ await updateDoc(doc(db, "stats", "ozlem"), { love: increment(1) }); addXP(10); }}} className="text-8xl animate-pulse active:scale-90 transition-transform">❤️</button>
-              <p className="mt-8 text-2xl font-black text-red-500 uppercase tracking-tighter">{stats.love} KEZ "SENİ SEVİYORUM" DENİLDİ</p>
-            </div>
-          </motion.div>
-        )}
-
-        {/* MEKTUPLAR */}
-        {activeTab === 'mektuplar' && (
-          <motion.div key="mektuplar" className="max-w-4xl mx-auto space-y-6">
-            {!isGuest && (
-              <div className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-lg'} p-6 rounded-3xl`}>
-                <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className={`w-full p-4 rounded-xl outline-none ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} rows={4} placeholder="Bir not bırak..." />
-                <button onClick={handleSendMessage} className="mt-4 px-8 py-3 bg-gradient-to-r from-pink-500 to-blue-500 text-white rounded-full font-bold">Gönder (+20 XP)</button>
-              </div>
-            )}
-            <div className="space-y-4">
-              {messages.map(m => (
-                <div key={m.id} className={`${isDarkMode ? 'bg-slate-800/80' : 'bg-white shadow-md'} p-6 rounded-3xl border-l-8 ${m.from === 'mert' ? 'border-blue-500' : 'border-pink-500'}`}>
-                  <p className="text-[10px] font-black opacity-50 mb-2 uppercase">{m.from} • {new Date(m.timestamp).toLocaleDateString()}</p>
-                  <p className="font-medium">{m.message}</p>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* HARİCİ BİLEŞENLER */}
         {activeTab === 'sanat' && <motion.div key="sanat"><SanatOdasi user={user || 'melek'} /></motion.div>}
         {activeTab === 'sinema' && <motion.div key="sinema"><SinemaSalonu user={user || 'melek'} /></motion.div>}
         {activeTab === 'kapsul' && <motion.div key="kapsul"><ZamanKapsulu user={user || 'melek'} /></motion.div>}
