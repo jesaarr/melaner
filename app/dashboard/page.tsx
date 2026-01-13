@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, X, Palette, Trash2, MessageCircle, Send, Plus, Paperclip, Lock, Check, Tv, Clock, BarChart3, Trophy, Heart, Star } from 'lucide-react'; 
+import { Settings, X, Palette, Trash2, MessageCircle, Send, Plus, Lock, Check, Clock, BarChart3, Trophy, Star } from 'lucide-react'; 
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, increment, collection, addDoc, query, orderBy, limit, deleteDoc, setDoc } from "firebase/firestore";
 import SanatOdasi from '@/components/SanatOdasi';
@@ -25,7 +25,7 @@ const Dashboard = () => {
   const [yogiInput, setYogiInput] = useState('');
   const [yogiRequest, setYogiRequest] = useState('');
   const [receivedRequests, setReceivedRequests] = useState<any[]>([]);
-  const [isYogiTyping, setIsYogiTyping] = useState(false); // Yogi cevap veriyor mu?
+  const [isYogiTyping, setIsYogiTyping] = useState(false);
 
   // --- STATS & CONTENT STATE ---
   const [stats, setStats] = useState({ mert: 0, melek: 0, love: 0, mertXP: 0, melekXP: 0, mertMsg: 0, melekMsg: 0 });
@@ -72,7 +72,7 @@ const Dashboard = () => {
     return () => { unsubStats(); clearInterval(interval); };
   }, [user]);
 
-  // --- YOGI AI AKILLI SOHBET FONKSİYONU ---
+  // --- ARIZA TESPİT MODLU YOGI FONKSİYONU ---
   const handleYogiChat = async () => {
     if (!yogiInput.trim() || isYogiTyping) return;
 
@@ -83,25 +83,34 @@ const Dashboard = () => {
 
     try {
       const API_KEY = process.env.NEXT_PUBLIC_YOGI_API_KEY;
-      const SYSTEM_PROMPT = `Sen Mert ve Melek'in uygulamasındaki akıllı kedi Yogi'sin. 
-      Mert ve Melek 10 Ekim'de tanıştı. Mert yakışıklı bir yazılımcı, Melek çok güzel ve özel biri.
-      Karakterin: Sempatik, bazen hafif huysuz, çok sadık. Cümlelerine "Miyav" ekle. 
-      Onlara aşk tavsiyeleri ver, sorularını kedi gibi cevapla.`;
+      
+      // 1. ADIM: Anahtar kontrolü
+      if (!API_KEY) {
+        setYogiMessages(prev => [...prev, { role: 'bot', text: "❌ HATA: API Anahtarı bulunamadı. Vercel'deki isim 'NEXT_PUBLIC_YOGI_API_KEY' olmalı." }]);
+        setIsYogiTyping(false);
+        return;
+      }
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nKullanıcı: ${currentInput}` }] }]
+          contents: [{ parts: [{ text: `Sen Mert ve Melek'in kedisi Yogi'sin. Şirin bir dille cevap ver. Kullanıcı: ${currentInput}` }] }]
         })
       });
 
       const data = await response.json();
-      const botResponse = data.candidates[0].content.parts[0].text;
 
-      setYogiMessages(prev => [...prev, { role: 'bot', text: botResponse }]);
+      // 2. ADIM: Google Hatası kontrolü
+      if (data.error) {
+        setYogiMessages(prev => [...prev, { role: 'bot', text: `❌ GOOGLE HATASI: ${data.error.message}` }]);
+      } else {
+        const botResponse = data.candidates[0].content.parts[0].text;
+        setYogiMessages(prev => [...prev, { role: 'bot', text: botResponse }]);
+      }
+
     } catch (error) {
-      setYogiMessages(prev => [...prev, { role: 'bot', text: "Miyav! Devrelerim ısındı, bir az sonra tekrar dener misin? 🐾" }]);
+      setYogiMessages(prev => [...prev, { role: 'bot', text: "💥 Bağlantı koptu. İnternetini veya API limitini kontrol et." }]);
     } finally {
       setIsYogiTyping(false);
     }
@@ -223,7 +232,7 @@ const Dashboard = () => {
         )}
       </AnimatePresence>
 
-      {/* --- GÜNCELLENMİŞ YOGI CHAT PANELİ --- */}
+      {/* YOGI CHAT PANELİ */}
       <AnimatePresence>
         {isYogiActive && (
           <motion.div initial={{ opacity: 0, scale: 0.8, y: 100 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.8, y: 100 }} className="fixed bottom-24 right-6 w-85 h-[450px] bg-white rounded-[32px] shadow-2xl z-[100] flex flex-col border border-pink-100 overflow-hidden">
@@ -246,7 +255,6 @@ const Dashboard = () => {
         )}
       </AnimatePresence>
 
-      {/* SEKMELER VE DİĞER İÇERİKLER AYNI ŞEKİLDE DEVAM EDİYOR... */}
       <div className="max-w-5xl mx-auto mb-8 mt-16 flex flex-wrap justify-center gap-3">
         {['tarihler', 'mektuplar', 'ozlem', 'istatistik', 'genel', 'dosyalar', 'sanat', 'sinema', 'kapsul'].map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-3 rounded-full font-bold transition-all flex items-center gap-2 ${activeTab === tab ? 'bg-gradient-to-r from-pink-400 to-blue-400 text-white shadow-lg' : 'bg-white/60 text-gray-600 hover:bg-white shadow-sm'}`}>
