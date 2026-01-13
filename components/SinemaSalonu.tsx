@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import YouTube from 'react-youtube';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc, updateDoc, collection, addDoc, query, orderBy, limit } from "firebase/firestore";
-import { Play, Pause, Link, Tv, Send, MessageSquare } from 'lucide-react';
+import { Play, Pause, Link, Tv, Send, MessageSquare, Globe } from 'lucide-react';
 
 export default function SinemaSalonu({ user }: { user: string }) {
   const [videoSource, setVideoSource] = useState({ type: 'youtube', id: 'dQw4w9WgXcQ' });
@@ -15,7 +15,6 @@ export default function SinemaSalonu({ user }: { user: string }) {
   const videoTagRef = useRef<HTMLVideoElement>(null);
   const isUpdatingRef = useRef(false);
 
-  // 1. VİDEO DURUMUNU DİNLE
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "sinema", "durum"), (docSnap) => {
       if (docSnap.exists()) {
@@ -40,7 +39,6 @@ export default function SinemaSalonu({ user }: { user: string }) {
     return () => unsub();
   }, [videoSource.id, user]);
 
-  // 2. SİNEMA CHAT DİNLE
   useEffect(() => {
     const q = query(collection(db, "sinema_chat"), orderBy("timestamp", "desc"), limit(20));
     const unsubChat = onSnapshot(q, (s) => {
@@ -50,11 +48,22 @@ export default function SinemaSalonu({ user }: { user: string }) {
   }, []);
 
   const handleUrlSubmit = async () => {
+    if (!inputUrl.trim()) return;
     let source = { type: 'youtube', id: '' };
+
     if (inputUrl.includes('youtube.com') || inputUrl.includes('youtu.be')) {
       source.id = inputUrl.split('v=')[1]?.split('&')[0] || inputUrl.split('/').pop() || '';
+      source.type = 'youtube';
+    } else if (inputUrl.includes('<iframe') || inputUrl.includes('src=')) {
+      // Eğer kullanıcı direkt embed kodu yapıştırırsa içindeki linki ayıkla
+      const match = inputUrl.match(/src="([^"]+)"/);
+      source.id = match ? match[1] : inputUrl;
+      source.type = 'embed';
+    } else if (inputUrl.match(/\.(mp4|webm|ogg)$/)) {
+      source = { type: 'direct', id: inputUrl };
     } else {
-      source = { type: 'direct', id: inputUrl }; // mp4 linki falan gelirse
+      // Geri kalan her şeyi 'embed' olarak dene (Film siteleri vb.)
+      source = { type: 'embed', id: inputUrl };
     }
 
     await setDoc(doc(db, "sinema", "durum"), {
@@ -72,15 +81,19 @@ export default function SinemaSalonu({ user }: { user: string }) {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 w-full max-w-6xl mx-auto p-4">
+    <div className="flex flex-col lg:flex-row gap-6 w-full max-w-7xl mx-auto p-2 sm:p-4">
       
       {/* SOL TARAF: VİDEO ALANI */}
       <div className="flex-1 space-y-4">
-        <div className="bg-black rounded-[32px] overflow-hidden shadow-2xl aspect-video border-4 border-white/20 relative">
-          {videoSource.type === 'youtube' ? (
+        <div className="bg-black rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-2xl aspect-video border-2 sm:border-4 border-white/20 relative">
+          {videoSource.type === 'youtube' && (
             <YouTube 
               videoId={videoSource.id} 
-              opts={{ width: '100%', height: '100%', playerVars: { autoplay: 0 } }} 
+              opts={{ 
+                width: '100%', 
+                height: '100%', 
+                playerVars: { autoplay: 0, controls: 1, rel: 0, modestbranding: 1 } 
+              }} 
               onReady={(e) => playerRef.current = e.target}
               onStateChange={async (e) => {
                 if (isUpdatingRef.current) return;
@@ -88,60 +101,79 @@ export default function SinemaSalonu({ user }: { user: string }) {
                   isPlaying: e.data === 1, time: e.target.getCurrentTime(), sender: user
                 });
               }}
-              className="w-full h-full"
+              className="absolute inset-0 w-full h-full"
             />
-          ) : (
+          )}
+          {videoSource.type === 'direct' && (
             <video 
               ref={videoTagRef}
               src={videoSource.id}
               controls
-              className="w-full h-full"
+              className="w-full h-full object-contain"
               onPlay={() => !isUpdatingRef.current && updateDoc(doc(db, "sinema", "durum"), { isPlaying: true, time: videoTagRef.current?.currentTime, sender: user })}
               onPause={() => !isUpdatingRef.current && updateDoc(doc(db, "sinema", "durum"), { isPlaying: false, time: videoTagRef.current?.currentTime, sender: user })}
             />
           )}
+          {videoSource.type === 'embed' && (
+            <iframe 
+              src={videoSource.id}
+              className="w-full h-full border-none"
+              allowFullScreen
+              allow="autoplay; encrypted-media; picture-in-picture"
+            />
+          )}
         </div>
 
-        <div className="flex gap-2 bg-white/50 p-2 rounded-2xl backdrop-blur-md">
-          <input 
-            value={inputUrl} 
-            onChange={(e) => setInputUrl(e.target.value)}
-            placeholder="YouTube veya MP4 Linki..." 
-            className="flex-1 bg-transparent border-none outline-none px-4 py-2 text-sm"
-          />
-          <button onClick={handleUrlSubmit} className="bg-blue-500 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-600 transition-all shadow-lg">Yükle</button>
+        {/* URL GİRİŞİ */}
+        <div className="flex flex-col sm:flex-row gap-2 bg-white/50 p-2 rounded-2xl backdrop-blur-md shadow-sm">
+          <div className="flex flex-1 items-center px-3 bg-white/50 rounded-xl">
+            <Globe size={16} className="text-gray-400 mr-2" />
+            <input 
+              value={inputUrl} 
+              onChange={(e) => setInputUrl(e.target.value)}
+              placeholder="YouTube, Film Linki veya MP4..." 
+              className="w-full bg-transparent border-none outline-none py-3 text-sm"
+            />
+          </div>
+          <button onClick={handleUrlSubmit} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md">
+            Yükle
+          </button>
         </div>
       </div>
 
       {/* SAĞ TARAF: SİNEMA CHAT */}
-      <div className="w-full lg:w-80 h-[450px] bg-white/80 backdrop-blur-xl rounded-[32px] shadow-xl flex flex-col border border-white/40">
-        <div className="p-4 border-b flex items-center gap-2 font-bold text-gray-700">
-          <MessageSquare size={18} className="text-blue-500" /> Sinema Chat
+      <div className="w-full lg:w-96 h-[400px] lg:h-auto bg-white/90 backdrop-blur-xl rounded-[32px] shadow-2xl flex flex-col border border-white/40 overflow-hidden">
+        <div className="p-5 border-b flex items-center gap-3 font-black text-gray-800 uppercase tracking-tight">
+          <div className="p-2 bg-blue-500 rounded-lg text-white shadow-lg shadow-blue-200">
+            <MessageSquare size={18} />
+          </div>
+          Sinema Chat
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((m) => (
             <div key={m.id} className={`flex flex-col ${m.user === user ? 'items-end' : 'items-start'}`}>
-              <span className="text-[10px] font-bold text-gray-400 uppercase px-1">{m.user}</span>
-              <div className={`px-3 py-2 rounded-2xl text-sm max-w-[90%] shadow-sm ${m.user === user ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'}`}>
+              <span className="text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">{m.user}</span>
+              <div className={`px-4 py-2 rounded-2xl text-[13px] max-w-[85%] shadow-sm leading-relaxed ${m.user === user ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white text-gray-700 rounded-tl-none border border-gray-100'}`}>
                 {m.text}
               </div>
             </div>
           ))}
         </div>
 
-        <div className="p-3 bg-gray-50/50 rounded-b-[32px] flex gap-2">
+        <div className="p-4 bg-gray-50/80 flex gap-2 border-t">
           <input 
             value={newMessage} 
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="Mesaj gönder..." 
-            className="flex-1 bg-white border-none rounded-xl px-3 py-2 text-xs outline-none shadow-inner"
+            placeholder="Kız kulesine bir mesaj bırak..." 
+            className="flex-1 bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm outline-none focus:ring-2 ring-blue-500/20 transition-all"
           />
-          <button onClick={handleSendMessage} className="p-2 bg-blue-500 text-white rounded-xl shadow-md"><Send size={16}/></button>
+          <button onClick={handleSendMessage} className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg hover:bg-blue-700 active:scale-90 transition-all">
+            <Send size={18}/>
+          </button>
         </div>
       </div>
-
     </div>
   );
 }
