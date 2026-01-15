@@ -3,12 +3,19 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, X, Palette, Trash2, MessageCircle, Send, Plus, Lock, Check, Clock, BarChart3, Trophy, Star, Image as ImageIcon, Upload, Loader2, Heart, Moon, Sun, Mail, Book } from 'lucide-react'; 
+import { 
+  Settings, X, Palette, Trash2, MessageCircle, Send, Plus, Lock, Check, 
+  Clock, BarChart3, Trophy, Star, Image as ImageIcon, Upload, Loader2, 
+  Heart, Moon, Sun, Mail, Book, LockKeyhole 
+} from 'lucide-react'; 
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, increment, collection, addDoc, query, orderBy, limit, deleteDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { 
+  doc, onSnapshot, updateDoc, increment, collection, addDoc, 
+  query, orderBy, limit, deleteDoc, setDoc, serverTimestamp 
+} from "firebase/firestore";
 
-// --- YENİ BİLEŞEN İMPORTLARI ---
-import Gunluk from '@/components/Gunluk'; // Dışarıdaki modern günlüğü bağladık
+// --- BİLEŞEN İMPORTLARI ---
+import Gunluk from '@/components/Gunluk';
 import SanatOdasi from '@/components/SanatOdasi';
 import SinemaSalonu from '@/components/SinemaSalonu';
 import ZamanKapsulu from '@/components/ZamanKapsulu';
@@ -27,7 +34,9 @@ const Dashboard = () => {
   const user = searchParams.get('user');
   const isGuest = user === 'guest';
 
+  // --- STATES ---
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isKavusmaOpen, setIsKavusmaOpen] = useState(false);
   const [themeColor, setThemeColor] = useState(user === 'mert' ? 'blue' : 'pink');
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [activeTab, setActiveTab] = useState('tarihler');
@@ -55,10 +64,17 @@ const Dashboard = () => {
     melekDogum: new Date('2011-02-15'),
     mertDogum: new Date('2009-04-21'),
     acilma: new Date('2025-12-14'),
-    cikma: new Date('2026-01-05')
+    cikma: new Date('2026-01-05'),
+    kavusma: new Date('2027-08-01')
   };
 
   const [now, setNow] = useState(new Date());
+
+  // --- HESAPLAMALAR ---
+  const gecenMilisaniye = now.getTime() - dates.tanisma.getTime();
+  const gecenGun = Math.floor(gecenMilisaniye / (1000 * 60 * 60 * 24));
+  const isAvailable = gecenGun > 0 && gecenGun % 50 === 0;
+  const kalanKavusmaGun = Math.floor((dates.kavusma.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   const themes: any = {
     pink: isDarkMode ? 'from-slate-950 via-pink-950/20 to-slate-950' : 'from-pink-50 via-pink-100 to-white',
@@ -68,6 +84,7 @@ const Dashboard = () => {
     green: isDarkMode ? 'from-slate-950 via-green-950/20 to-slate-950' : 'from-green-50 via-green-100 to-white'
   };
 
+  // --- FIREBASE EFFECT ---
   useEffect(() => {
     const unsubStats = onSnapshot(doc(db, "stats", "ozlem"), (docSnap) => {
       if (docSnap.exists()) setStats(docSnap.data() as any);
@@ -88,6 +105,7 @@ const Dashboard = () => {
     return () => { unsubStats(); clearInterval(interval); };
   }, [user]);
 
+  // --- HANDLERS ---
   const addXP = async (amount: number) => {
     if (isGuest) return; 
     const field = user === 'mert' ? 'mertXP' : 'melekXP';
@@ -165,7 +183,7 @@ const Dashboard = () => {
   };
 
   const calculateTimeElapsed = (targetDate: Date) => {
-    const diff = now.getTime() - targetDate.getTime();
+    const diff = Math.abs(now.getTime() - targetDate.getTime());
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -178,7 +196,55 @@ const Dashboard = () => {
       
       {isGuest && <div className="fixed top-0 left-0 w-full bg-amber-500 text-white text-[10px] font-black py-1 text-center z-[100] tracking-widest uppercase">Misafir Modu Aktif</div>}
 
+      {/* SOL ÜST AYARLAR */}
       <button onClick={() => setIsSettingsOpen(true)} className={`fixed top-6 left-6 p-3 ${isDarkMode ? 'bg-slate-800/80 text-white' : 'bg-white/80 text-slate-800'} backdrop-blur-md rounded-full shadow-lg z-[60] border border-white/10 hover:scale-110 transition-all`}><Settings size={22} /></button>
+      
+      {/* SAĞ ÜST KAVUŞMA KUTUSU */}
+      <div className="fixed top-6 right-6 z-[60] flex flex-col items-end gap-2">
+        <motion.button 
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsKavusmaOpen(!isKavusmaOpen)}
+          className={`p-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-2xl flex items-center gap-3 ${isDarkMode ? 'bg-indigo-900/40 text-indigo-300' : 'bg-white/80 text-indigo-600'}`}
+        >
+          <div className="text-right">
+            <p className="text-[9px] font-black uppercase tracking-tighter opacity-60">Kavuşma Kilidi</p>
+            <p className="text-xs font-bold">{gecenGun}. Gün</p>
+          </div>
+          <div className={`p-2 rounded-xl ${isAvailable ? 'bg-green-500/20 text-green-400' : 'bg-indigo-500/20'}`}>
+            {isAvailable ? <Heart size={20} className="fill-green-400" /> : <LockKeyhole size={20} />}
+          </div>
+        </motion.button>
+
+        <AnimatePresence>
+          {isKavusmaOpen && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              className={`w-64 p-5 rounded-[24px] shadow-2xl border border-white/10 backdrop-blur-xl ${isDarkMode ? 'bg-slate-900/90' : 'bg-white/90'}`}
+            >
+              {isAvailable ? (
+                <div className="text-center space-y-3">
+                  <div className="text-3xl animate-bounce">✈️</div>
+                  <h4 className="font-black text-sm text-indigo-400 uppercase italic">Kilit Açıldı!</h4>
+                  <p className="text-2xl font-black tabular-nums">{kalanKavusmaGun} GÜN</p>
+                  <p className="text-[10px] opacity-60 leading-tight tracking-tight text-center">Bugün o şanslı gün! Kavuşmaya bu kadar kaldı. 50 gün sonra tekrar görüşürüz.</p>
+                </div>
+              ) : (
+                <div className="text-center space-y-3">
+                  <div className="text-3xl grayscale opacity-50">🔒</div>
+                  <h4 className="font-black text-xs opacity-50 uppercase">Henüz Zamanı Değil</h4>
+                  <p className="text-[10px] leading-tight opacity-70">
+                    Bu kapı sadece her <span className="text-indigo-500 font-bold">50 günde bir</span> aralanır. <br/>
+                    Bir sonraki açılışa: <span className="font-bold text-indigo-400">{50 - (gecenGun % 50)} gün</span> var.
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* YOGİ BUTONU */}
       <button onClick={() => setIsYogiActive(true)} className="fixed bottom-6 right-6 p-4 bg-pink-600 text-white rounded-full shadow-2xl z-[60] hover:scale-110 transition-all"><MessageCircle size={24} /></button>
 
       {/* AYARLAR SIDEBAR */}
@@ -283,7 +349,7 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* GÜNLÜK - ARTIK DIŞARIDAKİ DOSYAYI ÇAĞIRIYOR */}
+        {/* GÜNLÜK */}
         {activeTab === 'gunluk' && <Gunluk user={user || 'melek'} isDarkMode={isDarkMode} />}
 
         {/* MEKTUPLAR */}
@@ -345,7 +411,7 @@ const Dashboard = () => {
                     <div className="text-right"><p className="text-[10px] opacity-50 uppercase">Lvl</p><p className="text-3xl font-black">{info.level}</p></div>
                   </div>
                   <div className="w-full h-3 bg-slate-200/20 rounded-full overflow-hidden">
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${(p.xp % info.next) / (info.next / 100)}%` }} className={`h-full bg-gradient-to-r ${p.color === 'blue' ? 'from-blue-400 to-blue-600' : 'from-pink-400 to-pink-600'}`} />
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${(p.xp % (info.next || 100)) / ((info.next || 100) / 100)}%` }} className={`h-full bg-gradient-to-r ${p.color === 'blue' ? 'from-blue-400 to-blue-600' : 'from-pink-400 to-pink-600'}`} />
                   </div>
                 </div>
               )
@@ -353,7 +419,7 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* DOSYALAR (GALERİ) */}
+        {/* DOSYALAR */}
         {activeTab === 'dosyalar' && (
           <motion.div key="dosyalar" className="max-w-4xl mx-auto space-y-6">
             {!passwordCorrect && !isGuest ? (
