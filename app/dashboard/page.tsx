@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Settings, X, Palette, Trash2, MessageCircle, Send, Plus, Lock, Check, 
   Clock, BarChart3, Trophy, Star, Image as ImageIcon, Upload, Loader2, 
-  Heart, Moon, Sun, Mail, Book, LockKeyhole 
+  Heart, Moon, Sun, Mail, Book, LockKeyhole, Stars, Sparkles, Unlock
 } from 'lucide-react'; 
 import { db } from '@/lib/firebase';
 import { 
@@ -19,7 +19,9 @@ import Gunluk from '@/components/Gunluk';
 import SanatOdasi from '@/components/SanatOdasi';
 import SinemaSalonu from '@/components/SinemaSalonu';
 import ZamanKapsulu from '@/components/ZamanKapsulu';
+import YuzuncuGunSurprizi from '@/components/YuzuncuGunSurprizi'; // Burası artık dışarıdan geliyor
 
+// --- DİĞER YARDIMCI BİLEŞENLER ---
 const LetterStamp = ({ sender }: { sender: string }) => (
   <div className="absolute top-4 right-4 w-12 h-16 bg-white border-2 border-dashed border-gray-300 p-1 shadow-sm rotate-3 group-hover:rotate-6 transition-transform z-10">
     <div className={`w-full h-full flex items-center justify-center text-xl ${sender === 'mert' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-600'}`}>
@@ -29,33 +31,25 @@ const LetterStamp = ({ sender }: { sender: string }) => (
   </div>
 );
 
+// --- ANA DASHBOARD BİLEŞENİ ---
 const Dashboard = () => {
   const searchParams = useSearchParams();
   const user = searchParams.get('user');
   const isGuest = user === 'guest';
 
-  // --- STATES ---
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isKavusmaOpen, setIsKavusmaOpen] = useState(false);
+  const [show100thDay, setShow100thDay] = useState(false);
   const [themeColor, setThemeColor] = useState(user === 'mert' ? 'blue' : 'pink');
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [activeTab, setActiveTab] = useState('tarihler');
   
-  const [isYogiActive, setIsYogiActive] = useState(false);
-  const [yogiMessages, setYogiMessages] = useState<{role: string, text: string}[]>([]);
-  const [yogiInput, setYogiInput] = useState('');
-  const [yogiRequest, setYogiRequest] = useState('');
-  const [receivedRequests, setReceivedRequests] = useState<any[]>([]);
-  const [isYogiTyping, setIsYogiTyping] = useState(false);
-
   const [stats, setStats] = useState({ mert: 0, melek: 0, love: 0, mertXP: 0, melekXP: 0, mertMsg: 0, melekMsg: 0 });
   const [messages, setMessages] = useState<any[]>([]);
   const [galeriResimleri, setGaleriResimleri] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [letterPaperColor, setLetterPaperColor] = useState('#fdfbf7');
   const [selectedLetter, setSelectedLetter] = useState<any>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [passwordCorrect, setPasswordCorrect] = useState(false);
   const [password, setPassword] = useState('');
 
@@ -70,10 +64,10 @@ const Dashboard = () => {
 
   const [now, setNow] = useState(new Date());
 
-  // --- HESAPLAMALAR ---
   const gecenMilisaniye = now.getTime() - dates.tanisma.getTime();
   const gecenGun = Math.floor(gecenMilisaniye / (1000 * 60 * 60 * 24));
   const isAvailable = gecenGun > 0 && gecenGun % 50 === 0;
+  const is100thDay = gecenGun >= 100; // 100 ve üstü günlerde aktif olsun
   const kalanKavusmaGun = Math.floor((dates.kavusma.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   const themes: any = {
@@ -84,7 +78,6 @@ const Dashboard = () => {
     green: isDarkMode ? 'from-slate-950 via-green-950/20 to-slate-950' : 'from-green-50 via-green-100 to-white'
   };
 
-  // --- FIREBASE EFFECT ---
   useEffect(() => {
     const unsubStats = onSnapshot(doc(db, "stats", "ozlem"), (docSnap) => {
       if (docSnap.exists()) setStats(docSnap.data() as any);
@@ -95,17 +88,10 @@ const Dashboard = () => {
     onSnapshot(query(collection(db, "galeri"), orderBy("timestamp", "desc")), (s) => {
       setGaleriResimleri(s.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-
-    if (user === 'mert') {
-      onSnapshot(query(collection(db, "talepler"), orderBy("timestamp", "desc"), limit(5)), (s) => {
-        setReceivedRequests(s.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      });
-    }
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => { unsubStats(); clearInterval(interval); };
   }, [user]);
 
-  // --- HANDLERS ---
   const addXP = async (amount: number) => {
     if (isGuest) return; 
     const field = user === 'mert' ? 'mertXP' : 'melekXP';
@@ -120,66 +106,19 @@ const Dashboard = () => {
   };
 
   const handleGuestWarning = () => {
-    if (isGuest) {
-      alert("Misafir Modu: Sadece görüntüleme yapabilirsiniz. 🐾");
-      return true;
-    }
+    if (isGuest) { alert("Misafir Modu: Sadece görüntüleme yapabilirsiniz. 🐾"); return true; }
     return false;
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (handleGuestWarning()) return;
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setPreviewUrl(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleFileUpload = async () => {
-    if (handleGuestWarning() || !previewUrl) return;
-    setIsUploading(true);
-    try {
-      await addDoc(collection(db, "galeri"), { url: previewUrl, sender: user, timestamp: Date.now() });
-      setPreviewUrl(null);
-      addXP(50);
-    } catch (e) { alert("Hata oluştu!"); }
-    finally { setIsUploading(false); }
-  };
-
-  const handleYogiChat = async () => {
-    if (handleGuestWarning()) return;
-    if (!yogiInput.trim() || isYogiTyping) return;
-    const currentInput = yogiInput;
-    setYogiMessages(prev => [...prev, { role: 'user', text: currentInput }]);
-    setYogiInput('');
-    setIsYogiTyping(true);
-    try {
-      const API_KEY = process.env.NEXT_PUBLIC_YOGI_API_KEY;
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: `Sen Mert ve Melek'in kedisi Yogi'sin. Şirin bir dille cevap ver. Kullanıcı: ${currentInput}` }] }] })
-      });
-      const data = await response.json();
-      setYogiMessages(prev => [...prev, { role: 'bot', text: data.candidates[0].content.parts[0].text }]);
-    } catch (error) {
-      setYogiMessages(prev => [...prev, { role: 'bot', text: "Miyav! Devrelerim ısındı... 🐾" }]);
-    } finally { setIsYogiTyping(false); }
-  };
-
   const handleSendMessage = async () => {
-    if (handleGuestWarning()) return;
-    if (newMessage.trim()) {
-      await addDoc(collection(db, "mektuplar"), { 
-        from: user, to: user === 'mert' ? 'melek' : 'mert', 
-        message: newMessage, color: letterPaperColor, timestamp: new Date().toISOString() 
-      });
-      await updateDoc(doc(db, "stats", "ozlem"), { [user === 'mert' ? 'mertMsg' : 'melekMsg']: increment(1) });
-      setNewMessage('');
-      addXP(20);
-    }
+    if (handleGuestWarning() || !newMessage.trim()) return;
+    await addDoc(collection(db, "mektuplar"), { 
+      from: user, to: user === 'mert' ? 'melek' : 'mert', 
+      message: newMessage, color: letterPaperColor, timestamp: new Date().toISOString() 
+    });
+    await updateDoc(doc(db, "stats", "ozlem"), { [user === 'mert' ? 'mertMsg' : 'melekMsg']: increment(1) });
+    setNewMessage('');
+    addXP(20);
   };
 
   const calculateTimeElapsed = (targetDate: Date) => {
@@ -194,131 +133,36 @@ const Dashboard = () => {
   return (
     <div className={`min-h-screen p-8 bg-gradient-to-br ${themes[themeColor]} transition-colors duration-1000 ${isDarkMode ? 'text-gray-100' : 'text-slate-900'}`}>
       
-      {isGuest && <div className="fixed top-0 left-0 w-full bg-amber-500 text-white text-[10px] font-black py-1 text-center z-[100] tracking-widest uppercase">Misafir Modu Aktif</div>}
+      {isGuest && <div className="fixed top-0 left-0 w-full bg-amber-500 text-white text-[8px] font-black py-1 text-center z-[100] tracking-widest uppercase">Misafir Modu Aktif</div>}
 
-      {/* SOL ÜST AYARLAR */}
-      <button onClick={() => setIsSettingsOpen(true)} className={`fixed top-6 left-6 p-3 ${isDarkMode ? 'bg-slate-800/80 text-white' : 'bg-white/80 text-slate-800'} backdrop-blur-md rounded-full shadow-lg z-[60] border border-white/10 hover:scale-110 transition-all`}><Settings size={22} /></button>
+      <button onClick={() => setIsSettingsOpen(true)} className="fixed top-6 left-6 p-3 bg-slate-800/80 backdrop-blur-md rounded-full shadow-lg z-[60] border border-white/10 hover:scale-110 transition-all"><Settings size={22} /></button>
       
       {/* SAĞ ÜST KAVUŞMA KUTUSU */}
       <div className="fixed top-6 right-6 z-[60] flex flex-col items-end gap-2">
         <motion.button 
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => setIsKavusmaOpen(!isKavusmaOpen)}
-          className={`p-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-2xl flex items-center gap-3 ${isDarkMode ? 'bg-indigo-900/40 text-indigo-300' : 'bg-white/80 text-indigo-600'}`}
+          onClick={() => {
+            if (is100thDay) setShow100thDay(true);
+            else setIsKavusmaOpen(!isKavusmaOpen);
+          }}
+          className={`p-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-2xl flex items-center gap-3 transition-all ${
+            is100thDay 
+              ? 'bg-gradient-to-r from-amber-500 to-yellow-300 text-slate-900 scale-110 ring-4 ring-amber-500/20' 
+              : (isDarkMode ? 'bg-indigo-900/40 text-indigo-300' : 'bg-white/80 text-indigo-600')
+          }`}
         >
           <div className="text-right">
-            <p className="text-[9px] font-black uppercase tracking-tighter opacity-60">Kavuşma Kilidi</p>
+            <p className="text-[9px] font-black uppercase tracking-tighter opacity-60">{is100thDay ? 'ÖZEL HEDİYE' : 'Kavuşma Kilidi'}</p>
             <p className="text-xs font-bold">{gecenGun}. Gün</p>
           </div>
-          <div className={`p-2 rounded-xl ${isAvailable ? 'bg-green-500/20 text-green-400' : 'bg-indigo-500/20'}`}>
-            {isAvailable ? <Heart size={20} className="fill-green-400" /> : <LockKeyhole size={20} />}
+          <div className={`p-2 rounded-xl ${is100thDay ? 'bg-white/30' : (isAvailable ? 'bg-green-500/20 text-green-400' : 'bg-indigo-500/20')}`}>
+            {is100thDay ? <Stars size={20} className="animate-pulse" /> : (isAvailable ? <Heart size={20} className="fill-green-400" /> : <LockKeyhole size={20} />)}
           </div>
         </motion.button>
-
-        <AnimatePresence>
-          {isKavusmaOpen && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              className={`w-64 p-5 rounded-[24px] shadow-2xl border border-white/10 backdrop-blur-xl ${isDarkMode ? 'bg-slate-900/90' : 'bg-white/90'}`}
-            >
-              {isAvailable ? (
-                <div className="text-center space-y-3">
-                  <div className="text-3xl animate-bounce">✈️</div>
-                  <h4 className="font-black text-sm text-indigo-400 uppercase italic">Kilit Açıldı!</h4>
-                  <p className="text-2xl font-black tabular-nums">{kalanKavusmaGun} GÜN</p>
-                  <p className="text-[10px] opacity-60 leading-tight tracking-tight text-center">Bugün o şanslı gün! Kavuşmaya bu kadar kaldı. 50 gün sonra tekrar görüşürüz.</p>
-                </div>
-              ) : (
-                <div className="text-center space-y-3">
-                  <div className="text-3xl grayscale opacity-50">🔒</div>
-                  <h4 className="font-black text-xs opacity-50 uppercase">Henüz Zamanı Değil</h4>
-                  <p className="text-[10px] leading-tight opacity-70">
-                    Bu kapı sadece her <span className="text-indigo-500 font-bold">50 günde bir</span> aralanır. <br/>
-                    Bir sonraki açılışa: <span className="font-bold text-indigo-400">{50 - (gecenGun % 50)} gün</span> var.
-                  </p>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
-      {/* YOGİ BUTONU */}
-      <button onClick={() => setIsYogiActive(true)} className="fixed bottom-6 right-6 p-4 bg-pink-600 text-white rounded-full shadow-2xl z-[60] hover:scale-110 transition-all"><MessageCircle size={24} /></button>
-
-      {/* AYARLAR SIDEBAR */}
-      <AnimatePresence>
-        {isSettingsOpen && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSettingsOpen(false)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]" />
-            <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className={`fixed top-0 left-0 h-full w-80 ${isDarkMode ? 'bg-slate-900' : 'bg-white'} shadow-2xl z-[80] p-6 border-r border-white/10 overflow-y-auto`}>
-               <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black italic tracking-tighter">AYARLAR</h2><button onClick={() => setIsSettingsOpen(false)}><X /></button></div>
-               <div className="space-y-8">
-                  <div>
-                    <p className="text-[10px] font-bold opacity-50 mb-3 uppercase tracking-widest flex items-center gap-2"><Palette size={14}/> Tema Rengi</p>
-                    <div className="flex gap-2">
-                      {['pink', 'blue', 'purple', 'orange', 'green'].map(c => (
-                        <button key={c} onClick={() => setThemeColor(c)} className={`w-8 h-8 rounded-full ${themeColor === c ? 'ring-2 ring-offset-2' : ''}`} style={{ background: c === 'pink' ? '#f472b6' : c === 'blue' ? '#60a5fa' : c === 'purple' ? '#a78bfa' : c === 'orange' ? '#fb923c' : '#4ade80' }} />
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold opacity-50 mb-3 uppercase tracking-widest flex items-center gap-2"><Moon size={14}/> Görünüm</p>
-                    <button onClick={() => setIsDarkMode(!isDarkMode)} className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${isDarkMode ? 'bg-slate-800 text-yellow-400' : 'bg-slate-100 text-slate-800'}`}>
-                      {isDarkMode ? <><Sun size={18}/> Aydınlık Moda Geç</> : <><Moon size={18}/> Karanlık Moda Geç</>}
-                    </button>
-                  </div>
-                  {!isGuest && (
-                    user === 'melek' ? (
-                      <div className="pt-6 border-t border-white/10">
-                        <p className="text-[10px] font-bold opacity-50 mb-3 uppercase tracking-widest flex items-center gap-2"><Star size={14}/> Mert'ten İste</p>
-                        <textarea value={yogiRequest} onChange={(e) => setYogiRequest(e.target.value)} placeholder="İsteğin..." className={`w-full text-sm rounded-xl p-3 outline-none mb-2 ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-900'}`} rows={3} />
-                        <button onClick={async () => { if(yogiRequest.trim()){ await addDoc(collection(db, "talepler"), { from: user, text: yogiRequest, timestamp: new Date().toISOString() }); setYogiRequest(''); alert('İletildi!'); } }} className="w-full py-2 bg-pink-600 text-white rounded-xl text-sm font-bold">Gönder</button>
-                      </div>
-                    ) : (
-                      <div className="pt-6 border-t border-white/10">
-                        <p className="text-[10px] font-bold opacity-50 mb-3 uppercase tracking-widest flex items-center gap-2"><Trophy size={14}/> Melek'in İstekleri</p>
-                        <div className="space-y-2">
-                          {receivedRequests.map(r => (
-                            <div key={r.id} className="p-3 bg-blue-900/30 rounded-xl border border-blue-500/30 relative group">
-                              <p className="text-xs text-blue-200">{r.text}</p>
-                              <button onClick={async () => await deleteDoc(doc(db, "talepler", r.id))} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-400"><X size={12}/></button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  )}
-               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* YOGI CHAT */}
-      <AnimatePresence>
-        {isYogiActive && (
-          <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className={`fixed bottom-24 right-6 w-80 h-[450px] ${isDarkMode ? 'bg-slate-900' : 'bg-white'} rounded-[32px] shadow-2xl z-[100] flex flex-col border border-white/10 overflow-hidden`}>
-            <div className="bg-pink-600 p-5 text-white font-bold flex justify-between items-center">
-              <span className="flex items-center gap-2"><MessageCircle size={20}/> Yogi AI</span>
-              <button onClick={() => setIsYogiActive(false)}><X size={18}/></button>
-            </div>
-            <div className={`flex-1 p-5 overflow-y-auto space-y-3 ${isDarkMode ? 'bg-slate-950/50' : 'bg-slate-50'}`}>
-              {yogiMessages.map((m, i) => (
-                <div key={i} className={`p-3 rounded-2xl text-sm ${m.role === 'user' ? 'bg-pink-600 text-white ml-auto rounded-tr-none' : 'bg-slate-700 text-white rounded-tl-none'}`}>{m.text}</div>
-              ))}
-              {isYogiTyping && <div className="text-[10px] text-pink-400 italic animate-pulse">Yogi yazıyor... 🐾</div>}
-            </div>
-            <div className={`p-4 border-t border-white/10 flex gap-2 ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
-              <input disabled={isGuest} value={yogiInput} onChange={(e) => setYogiInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleYogiChat()} className={`flex-1 text-sm rounded-full px-4 py-2 outline-none ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-900'}`} placeholder={isGuest ? "Misafirler yazamaz" : "Miyav?"} />
-              <button onClick={handleYogiChat} className="p-2 bg-pink-600 text-white rounded-full"><Send size={18}/></button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* TABS */}
+      {/* TABS SEÇİCİ */}
       <div className="max-w-6xl mx-auto mb-12 mt-16 flex flex-wrap justify-center gap-3">
         {['tarihler', 'mektuplar', 'gunluk', 'ozlem', 'istatistik', 'dosyalar', 'sanat', 'sinema', 'kapsul'].map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-3 rounded-full font-bold transition-all ${activeTab === tab ? 'bg-gradient-to-r from-pink-500 to-blue-500 text-white shadow-lg scale-105' : (isDarkMode ? 'bg-slate-800/60 text-gray-300' : 'bg-white text-slate-600 shadow-sm')}`}>
@@ -328,7 +172,6 @@ const Dashboard = () => {
       </div>
 
       <AnimatePresence mode="wait">
-        {/* TARİHLER */}
         {activeTab === 'tarihler' && (
           <motion.div key="tarihler" className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
@@ -343,16 +186,14 @@ const Dashboard = () => {
                   <div><h3 className={`text-${d.color}-500 font-black text-[10px] tracking-widest uppercase mb-1`}>{d.title}</h3><p className="text-2xl font-black">{d.date}</p></div>
                   {d.highlight && <Heart className="text-red-500 fill-red-500 animate-bounce" />}
                 </div>
-                <div className={`${isDarkMode ? 'bg-slate-950/50 text-gray-300' : 'bg-slate-100 text-slate-600'} p-3 rounded-xl mt-4 font-mono text-xs`}>⌛ {calculateTimeElapsed(d.val)}</div>
+                <div className="p-3 rounded-xl mt-4 font-mono text-xs bg-black/20 text-gray-300">⌛ {calculateTimeElapsed(d.val)}</div>
               </div>
             ))}
           </motion.div>
         )}
 
-        {/* GÜNLÜK */}
         {activeTab === 'gunluk' && <Gunluk user={user || 'melek'} isDarkMode={isDarkMode} />}
 
-        {/* MEKTUPLAR */}
         {activeTab === 'mektuplar' && (
           <motion.div key="mektuplar" className="max-w-4xl mx-auto space-y-12 pb-20">
             {!isGuest && (
@@ -362,53 +203,46 @@ const Dashboard = () => {
                         <button key={c} onClick={() => setLetterPaperColor(c)} className={`w-6 h-6 rounded-full border-2 ${letterPaperColor === c ? 'border-yellow-500 scale-125' : 'border-transparent'}`} style={{ backgroundColor: c }} />
                     ))}
                 </div>
-                <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} style={{ backgroundColor: letterPaperColor }} className="w-full p-6 rounded-2xl text-slate-800 font-serif text-lg leading-relaxed shadow-inner outline-none" rows={4} placeholder="Duygularını kağıda dök..." />
-                <div className="flex justify-end mt-4"><button onClick={handleSendMessage} className="px-10 py-3 bg-yellow-700 text-white font-serif italic hover:bg-yellow-800 transition-all shadow-md flex items-center gap-2 rounded-xl"><Send size={16} /> Gönder</button></div>
+                <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} style={{ backgroundColor: letterPaperColor }} className="w-full p-6 rounded-2xl text-slate-800 font-serif text-lg outline-none shadow-inner" rows={4} placeholder="Duygularını dök..." />
+                <div className="flex justify-end mt-4"><button onClick={handleSendMessage} className="px-10 py-3 bg-yellow-700 text-white font-serif italic rounded-xl hover:bg-yellow-800 transition-colors flex items-center gap-2"><Send size={16} /> Gönder</button></div>
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {messages.map((m, index) => (
-                <motion.div key={m.id} whileHover={{ scale: 1.02 }} onClick={() => setSelectedLetter(m)} className={`cursor-pointer group relative p-8 h-48 ${isDarkMode ? 'bg-[#f4f1ea]' : 'bg-white'} border border-slate-200 shadow-sm flex flex-col justify-between`} style={{ transform: `rotate(${index % 2 === 0 ? '1deg' : '-1deg'})` }}>
+                <motion.div key={m.id} whileHover={{ scale: 1.02 }} onClick={() => setSelectedLetter(m)} className="cursor-pointer group relative p-8 h-48 bg-[#f4f1ea] border border-slate-200 flex flex-col justify-between shadow-sm" style={{ transform: `rotate(${index % 2 === 0 ? '1' : '-1'}deg)` }}>
                   <LetterStamp sender={m.from} />
-                  <div className="z-10 mt-auto"><span className="text-[10px] font-black text-slate-400">KAPALI MEKTUP</span><br/><span className="text-[10px] font-serif italic text-slate-400">{new Date(m.timestamp).toLocaleDateString('tr-TR')}</span></div>
+                  <div className="z-10 mt-auto font-serif italic text-slate-400 text-xs">{new Date(m.timestamp).toLocaleDateString()}</div>
                 </motion.div>
               ))}
             </div>
           </motion.div>
         )}
 
-        {/* ÖZLEM */}
         {activeTab === 'ozlem' && (
           <motion.div key="ozlem" className="max-w-4xl mx-auto text-center space-y-8">
             <div className="grid grid-cols-2 gap-8">
               {['mert', 'melek'].map((p) => (
-                <div key={p} className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-xl'} p-8 rounded-[40px]`}>
+                <div key={p} className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-xl'} p-8 rounded-[40px] border border-white/5`}>
                   <h3 className={`${p === 'mert' ? 'text-blue-500' : 'text-pink-500'} font-black text-[10px] mb-4 uppercase`}>{p}</h3>
                   <button onClick={async () => { if(!handleGuestWarning()){ await updateDoc(doc(db, "stats", "ozlem"), { [p]: increment(1) }); addXP(5); }}} className="text-6xl hover:scale-110 active:scale-95 transition-transform">{p === 'mert' ? '💙' : '💖'}</button>
                   <p className="text-3xl font-black mt-4">{(stats as any)[p]}</p>
                 </div>
               ))}
             </div>
-            <div className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-2xl'} p-12 rounded-[50px] flex flex-col items-center`}>
-              <button onClick={async () => { if(!handleGuestWarning()){ await updateDoc(doc(db, "stats", "ozlem"), { love: increment(1) }); addXP(10); }}} className="text-8xl animate-pulse active:scale-90 transition-transform">❤️</button>
-              <p className="mt-8 text-2xl font-black text-red-500 uppercase tracking-tighter">{stats.love} KEZ "SENİ SEVİYORUM" DENİLDİ</p>
-            </div>
           </motion.div>
         )}
 
-        {/* İSTATİSTİK */}
         {activeTab === 'istatistik' && (
           <motion.div key="istatistik" className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
             {[{ name: 'Mert', xp: stats.mertXP || 0, color: 'blue' }, { name: 'Melek', xp: stats.melekXP || 0, color: 'pink' }].map((p, i) => {
               const info = getLevelInfo(p.xp);
               return (
-                <div key={i} className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-xl'} p-8 rounded-[40px] border border-white/10`}>
+                <div key={i} className="bg-slate-900/80 p-8 rounded-[40px] border border-white/10">
                   <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-4">
                       <div className="text-4xl">{info.icon}</div>
                       <div><h2 className={`text-2xl font-black ${p.color === 'blue' ? 'text-blue-500' : 'text-pink-500'}`}>{p.name}</h2><p className={`text-[10px] font-bold ${info.color}`}>{info.rank}</p></div>
                     </div>
-                    <div className="text-right"><p className="text-[10px] opacity-50 uppercase">Lvl</p><p className="text-3xl font-black">{info.level}</p></div>
                   </div>
                   <div className="w-full h-3 bg-slate-200/20 rounded-full overflow-hidden">
                     <motion.div initial={{ width: 0 }} animate={{ width: `${(p.xp % (info.next || 100)) / ((info.next || 100) / 100)}%` }} className={`h-full bg-gradient-to-r ${p.color === 'blue' ? 'from-blue-400 to-blue-600' : 'from-pink-400 to-pink-600'}`} />
@@ -418,46 +252,43 @@ const Dashboard = () => {
             })}
           </motion.div>
         )}
-
-        {/* DOSYALAR */}
-        {activeTab === 'dosyalar' && (
-          <motion.div key="dosyalar" className="max-w-4xl mx-auto space-y-6">
-            {!passwordCorrect && !isGuest ? (
-              <div className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-white shadow-2xl'} max-w-md mx-auto p-8 rounded-[32px] text-center`}><Lock className="mx-auto mb-4 text-pink-500" size={40} /><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 rounded-2xl mb-4 bg-slate-800 text-center" placeholder="Şifre" /><button onClick={() => password === '1025' ? setPasswordCorrect(true) : alert('Hatalı!')} className="w-full py-4 bg-pink-600 rounded-2xl font-black">Giriş</button></div>
-            ) : (
-              <div className="space-y-6">
-                {!isGuest && (
-                  <div className="bg-slate-900/80 p-8 rounded-[40px] text-center">
-                    <label className="cursor-pointer inline-block"><div className="border-2 border-dashed border-slate-700 rounded-3xl p-8">{previewUrl ? <img src={previewUrl} className="w-48 h-48 object-cover rounded-2xl" /> : <ImageIcon size={40}/>}</div><input type="file" onChange={handleFileChange} className="hidden" /></label>
-                    {previewUrl && <button onClick={handleFileUpload} className="block mx-auto mt-4 px-8 py-3 bg-pink-600 rounded-xl font-bold">Yükle</button>}
-                  </div>
-                )}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                  {galeriResimleri.map((img) => (<div key={img.id} className="relative aspect-[3/4] rounded-3xl overflow-hidden group"><img src={img.url} className="w-full h-full object-cover" /><button onClick={async () => { if(confirm("Silmek istiyor musun?")) await deleteDoc(doc(db, "galeri", img.id)); }} className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-red-400"><Trash2/></button></div>))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* DİĞER KOMPONENTLER */}
+        
         {activeTab === 'sanat' && <motion.div key="sanat"><SanatOdasi user={user || 'melek'} /></motion.div>}
         {activeTab === 'sinema' && <motion.div key="sinema"><SinemaSalonu user={user || 'melek'} /></motion.div>}
         {activeTab === 'kapsul' && <motion.div key="kapsul"><ZamanKapsulu user={user || 'melek'} /></motion.div>}
+        {activeTab === 'dosyalar' && (
+          <motion.div key="dosyalar" className="max-w-4xl mx-auto space-y-6">
+              {!passwordCorrect && !isGuest ? (
+                <div className="bg-slate-900/80 p-8 rounded-3xl text-center"><Lock className="mx-auto mb-4 text-pink-500" /><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 rounded-xl bg-slate-800 mb-4 text-white" placeholder="Şifre..." /><button onClick={() => password === '1025' ? setPasswordCorrect(true) : alert('Hata!')} className="w-full py-4 bg-pink-600 rounded-xl font-bold">Giriş</button></div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                  {galeriResimleri.map((img) => (<div key={img.id} className="relative aspect-square rounded-xl overflow-hidden group border border-white/10 shadow-lg"><img src={img.url} className="w-full h-full object-cover" /></div>))}
+                </div>
+              )}
+          </motion.div>
+        )}
       </AnimatePresence>
 
-      {/* MEKTUP OKUMA MODALI */}
+      {/* MODALLER VE SÜRPRİZLER */}
       <AnimatePresence>
+        {isSettingsOpen && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSettingsOpen(false)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]" />
+            <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="fixed top-0 left-0 h-full w-80 bg-slate-900 z-[80] p-6 border-r border-white/10">
+               <h2 className="text-xl font-black mb-8 italic">AYARLAR</h2>
+               <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full py-3 bg-slate-800 rounded-xl font-bold mb-4">{isDarkMode ? 'Aydınlık Mod' : 'Karanlık Mod'}</button>
+            </motion.div>
+          </>
+        )}
+
+        {/* 100. GÜN SÜRPRİZİ BURADA ÇAĞRILIYOR */}
+        {show100thDay && <YuzuncuGunSurprizi onClose={() => setShow100thDay(false)} />}
+        
         {selectedLetter && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedLetter(null)} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="relative w-full max-w-2xl p-12 rounded-sm shadow-2xl" style={{ backgroundColor: selectedLetter.color || '#fdfbf7' }}>
-              <button onClick={() => setSelectedLetter(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900"><X /></button>
-              <LetterStamp sender={selectedLetter.from} />
-              <p className="text-slate-800 font-serif text-xl leading-[2] whitespace-pre-wrap">{selectedLetter.message}</p>
-              {selectedLetter.from === user && !isGuest && (
-                <button onClick={async () => { if(confirm("Silinsin mi?")) { await deleteDoc(doc(db, "mektuplar", selectedLetter.id)); setSelectedLetter(null); }}} className="mt-8 text-red-300 hover:text-red-500"><Trash2 size={20}/></button>
-              )}
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="relative w-full max-w-2xl p-12 rounded-sm shadow-2xl" style={{ backgroundColor: selectedLetter.color }}>
+              <p className="text-slate-800 font-serif text-xl leading-relaxed whitespace-pre-wrap">{selectedLetter.message}</p>
             </motion.div>
           </div>
         )}
