@@ -140,7 +140,7 @@ const Gunluk = ({ user, isDarkMode }: GunlukProps) => {
       </div>
 
       <p className="text-center mt-4 text-[9px] opacity-20 font-bold uppercase tracking-[0.2em]">
-        Sayfalar arasında gezmek için okları kullan
+        Sayfalar arasında gezmek için okları kullan güzeliim
       </p>
 
     </motion.div>

@@ -16,26 +16,26 @@ const YuzuncuGunSurprizi = ({ onClose }: Props) => {
     "nasıl ama afafuehsuekghs",
     "Bugün seni dünden daha çok özledim.",
     "Aramızdaki mesafeler kalplerimize engel değil.",
-    "Sen benim hayatımdaki en güzel 'iyi ki'sin.",
+    "Sen benim hayatımdaki en güzeeeel şeysin.",
     "Sesini duyduğumda dünyam güzelleşiyor."
   ];
 
   const messages = [
-    { t: "Yanında değilim Melek, belki ellerini tutamıyorum ama bu ekranın her pikselinde sana olan sevgim var. Tam 100 gündür her sabah seninle uyandım, her gece seninle uyudum. Bu 100 gün, ömrümün geri kalanının sadece fragmanı sevgilim... Seni çok seviyorum.", p: "Söz veriyorum: Kavuştuğumuzda elini bir an bile bırakmayacağım." },
-    { t: "Aramızdaki kilometreler sadece birer sayıdan ibaret. Kalbim her atışında senin adını sayıklıyor. Bu 100 gün boyunca mesafeleri sevgimizle kısalttık.", p: "Söz veriyorum: Her sabah senin sesinle uyanman için elimden geleni yapacağım." },
-    { t: "Gözlerimi kapattığımda seni yanımda hissedebiliyorum. Kokun, sesin, gülüşün... Hepsi zihnimin en güzel köşesinde saklı.", p: "Söz veriyorum: Tüm hayallerini gerçekleştirmek için yanında olacağım." },
-    { t: "Biliyor musun, sen benim hayatıma giren en güzel 'iyi ki'sin. Seninle geçen her saniye, ömrüme ömür katıyor.", p: "Söz veriyorum: En zor anında bile omzum senin huzurun olacak." },
-    { t: "Dünyanın en güzel manzarası nedir biliyor musun? Senin o içten gülüşün. Ekranın ötesinden bile içimi ısıtan tek şeysin.", p: "Söz veriyorum: Gülüşünün solmasına asla izin vermeyeceğim." },
-    { t: "100 gündür her sabah uyandığımda ilk işim telefonuma bakmak oldu. Senin bir mesajınla güne başlamak en büyük mutluluk.", p: "Söz veriyorum: Seni her gün dünyanın en şanslı kadını hissettireceğim." },
-    { t: "Bazen gökyüzüne bakıyorum ve senin de aynı aya baktığını bilmek içimi huzurla dolduruyor. Tek bir kalpteyiz.", p: "Söz veriyorum: Mesafelerin bizi yormasına asla izin vermeyeceğim." },
-    { t: "Sana olan özlemim bazen canımı yaksa da, bu özlemin sebebi sen olduğun için onu bile seviyorum.", p: "Söz veriyorum: Özlediğimiz her saniye için bin katı sarılacağım." },
-    { t: "Sen benim sadece sevgilim değil, en yakın dostum, sırdaşım ve geleceğimsin. El ele daha nice 100 günlere!", p: "Söz veriyorum: Tüm sırlarımızı ve mutluluklarımızı beraber biriktireceğiz." },
-    { t: "Ellerini tutacağım o anı düşlemek bile nefesimi kesiyor. O gün geldiğinde, bir daha asla bırakmayacağım.", p: "Söz veriyorum: Kavuştuğumuz gün zamanı durduracağım." },
-    { t: "Bu dijital evrende sana küçük bir dünya kurdum. Belki dokunamıyorum ama ruhuna sarılıyorum.", p: "Söz veriyorum: Ruhuna her gün aynı aşkla dokunacağım." },
-    { t: "Seninle konuşurken zamanın nasıl geçtiğini anlamıyorum. 100 günün her anı hafızamda bir pırlanta gibi saklı.", p: "Söz veriyorum: Gelecekteki 1000 günümüzü daha güzel kılacağım." },
-    { t: "Seni sevmek, karanlık bir odada güneşin doğmasını izlemek gibi. Hayatımı aydınlattığın için teşekkürler.", p: "Söz veriyorum: Karanlığında her zaman güneşin olacağım." },
-    { t: "Mesafeler sadece dokunmaya engeldir, sevmeye asla. Ben seni ruhumla seviyorum Melek.", p: "Söz veriyorum: Ruhumuz arasındaki bağ asla kopmayacak." },
-    { t: "Bu yolun sonu kavuşmak... Sabrediyoruz çünkü sonunda sen varsın. Seni her şeyden çok seviyorum.", p: "Söz veriyorum: Bu hikayenin sonu hep 'mutluluk' olacak." }
+    { t: "Yanında değilim melek belki ellerini tutamıyorum ama sana olan sevgim hep kalacak tam 100 gündür her sabah seninle uyandım her gece seninle uyudum. Bu 100 gün, ömrümün geri kalanının sadece fragmanı olsun sevgilim Seni çok seviyorum", p: "Söz veriyorum Kavuştuğumuzda elini bir an bile bırakmayacağım" },
+    { t: "Aramızdaki kilometreler sadece birer sayıdan ibaret bence ya Kalbim her atışında senin adını sayıklıyor bebegim", p: "Söz veriyorum birgün sıkıca sarılcaz" },
+    { t: "Gözlerimi kapattığımda seni yanımda hissedebiliyorum. Kokun, sesin, gülüşün... Hepsi zihnimin en güzel köşesinde saklı.", p: "Söz veriyorum Tüm hayallerini gerçekleştirmek için yanında olcam." },
+    { t: "Biliyomusun sen benim hayatıma giren en güzel iyi ki sin seninle geçen her saniye mükemmel", p: "Söz veriyorum en zor anında bile senle olucam" },
+    { t: "Dünyanın en güzel şeyi neydi biliyo musun senin o içten gülüşündü :) Ekranın ötesinden bile içimi ısıtan tek şeysin güzelim", p: " Gülüşünü asla eksiltmicem" },
+    { t: "100 gündür her sabah uyandığımda ilk işim telefonuma bakmak oldu ya senin bir mesajınla güne başlamak en güzel şey bitaanem", p: "Söz seni heep en şanslı kız olarark hissettiricem." },
+    { t: "Bazen sana sonunda sarlıcak olduğumu bilmek beni rahatlatıyor", p: "Kesimlikle Olacak" },
+    { t: "Sana olan özlemim bazen canımı cok yaksa da bu özlemin sebebi sen olduğun için onu bile seviyorum", p: " Özlediğim her saniye için bin katı sarılcam." },
+    { t: "Sen benim sadece sevgilim değil herseyimsin en yakın arkadaşım bile", p: "Buna dicek bişi bulamadım asfhsgfdsjfg" },
+    { t: "ŞU an bunu yazarken seni nasıl özlüyorum bilemzsin ya", p: "Çoooookkkkkkkkkkkk özledim" },
+    { t: "Bu her ne kadar çok basit ve yazılardan ibaret olsa da uğraşmaya değerdi", p: "her özel günde yanında olmak istiyorum." },
+    { t: "Seninle konuşurken zamanın nasıl geçtiğini anlamıyorum bile bebegim umarım diger zamanlarda da hiç anlayamayız ", p: "değil 100 1000. günümüzde olsun" },
+    { t: "En BÜYÜK motivasyonumsun hep öyle kaal olurmu", p: "her zaman" },
+    { t: "Bağımızda hiç kopmasın", p: "Ben senden hayatta kopamam ki zaten" },
+    { t: "Güzelim umarım birgün bunları yan yana okuyup beraber dalga geçeriz :))", p: "Çok gülmek yok ama amfhgjafgkf" }
   ];
 
   const bgColors = ["bg-pink-900", "bg-blue-900", "bg-purple-900", "bg-red-900", "bg-teal-900", "bg-orange-900", "bg-indigo-900", "bg-emerald-900", "bg-rose-900", "bg-cyan-900", "bg-violet-900", "bg-amber-900", "bg-fuchsia-900", "bg-slate-900", "bg-red-600"];
